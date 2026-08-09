@@ -2,6 +2,10 @@
 
 Lightweight Office/Fusion-style ribbon for **FreeCAD 1.1+**. The active workbench’s toolbars become compact side-by-side groups (small bottom titles, 3-row button grid)—not one oversized tab per toolbar. Classic toolbars are hidden while enabled and restored on disable. **No pip packages and no vendored ribbon toolkit.**
 
+![NeoRibbon with OpenLight theme](images/NeoRibbon_OpenLight.png)
+
+![NeoRibbon with OpenDark theme](images/NeoRibbon_OpenDark.png)
+
 ## Requirements
 
 - FreeCAD **1.1.0** or newer (Qt6 / PySide via FreeCAD’s `PySide` wrapper)
@@ -49,6 +53,7 @@ When published, install via **Tools → Addon manager**. Until then, use the man
 |--------|-----|
 | Toggle ribbon | **Tools → Toggle NeoRibbon** (or run `NeoRibbon_Toggle`) |
 | Toggle large section icon | **Tools → Toggle large section icon** (`NeoRibbon_ToggleLargeIcon`) |
+| Toggle button text labels | **Tools → Toggle button text labels** (`NeoRibbon_ToggleButtonLabels`) |
 | Preferences | **Tools → NeoRibbon preferences…** or **Edit → Preferences → NeoRibbon** |
 | Emergency toolbar restore | **Tools → Restore classic toolbars** (`NeoRibbon_RestoreToolbars`) |
 
@@ -56,12 +61,13 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 
 - **Enabled** — show ribbon / hide classic toolbars
 - **Promote large** — show the first focus command as a large icon per section (default on)
+- **Show button labels** — text beside/under focus-strip icons (default on); section dropdowns always keep labels
 - **Button size** — `small` \| `medium` \| `large`
 - **Visible commands / section** — most-used commands shown as buttons (default 6); the rest are under **More ▾**
 - **Ignored toolbars** — semicolon-separated FreeCAD toolbar names to skip permanently
 - **Hide menu bar** — optional; default off
 
-**Sections:** click **×** to hide a section, or use **Sections ▾**. Click **▾** under a section for a full labeled command list; use the **pin** on each row to keep that command in the focus strip.
+**Sections:** click **×** to hide a section, or use **Sections ▾**. Click **▾** under a section for a full labeled command list (with shortcuts in parentheses when set); use the **pin** on each row to keep that command in the focus strip.
 
 **Workbench:** NeoRibbon hides the classic toolbar that held FreeCAD’s workbench combo. Use the **Workbench** control at the **left** of the ribbon instead.
 

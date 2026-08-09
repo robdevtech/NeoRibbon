@@ -215,6 +215,9 @@ def build_stylesheet(colors: ThemeColors | None = None) -> str:
         QWidget#NeoRibbon_group_footer {{
             border-top: 1px solid {colors.border};
         }}
+        QWidget#NeoRibbon_group_footer_click:hover {{
+            background: {colors.hover};
+        }}
         QToolButton#NeoRibbon_section_drop,
         QToolButton#NeoRibbon_hide_section,
         QToolButton#NeoRibbon_workbench_button,
@@ -256,6 +259,12 @@ def build_stylesheet(colors: ThemeColors | None = None) -> str:
         QFrame#NeoRibbon_section_list QLabel {{
             color: {colors.text};
             background: transparent;
+        }}
+        QLabel#NeoRibbon_shortcut {{
+            color: {colors.muted};
+            background: transparent;
+            padding-right: 4px;
+            font-size: 11px;
         }}
         QListWidget#NeoRibbon_section_list_view {{
             background: {colors.background};

@@ -29,6 +29,7 @@ _PREF_PAGE_KEYS = frozenset(
         "Enabled",
         "HideMenubar",
         "PromoteLarge",
+        "ShowButtonLabels",
         "ButtonSize",
         "VisiblePerSection",
         "IgnoredToolbars",

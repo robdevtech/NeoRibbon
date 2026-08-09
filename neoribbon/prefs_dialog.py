@@ -28,6 +28,11 @@ class PreferencesDialog(QDialog):
         self.enabled = QCheckBox("Enable ribbon")
         self.hide_menubar = QCheckBox("Hide menu bar while ribbon is enabled")
         self.promote_large = QCheckBox("Large icon for first command in each section")
+        self.show_labels = QCheckBox("Text labels on ribbon buttons")
+        self.show_labels.setToolTip(
+            "When off, the focus strip shows icons only. "
+            "Section dropdown lists always keep text labels."
+        )
         self.button_size = QComboBox()
         for size in prefs.BUTTON_SIZES:
             self.button_size.addItem(size.capitalize(), size)
@@ -43,6 +48,7 @@ class PreferencesDialog(QDialog):
         form.addRow(self.enabled)
         form.addRow(self.hide_menubar)
         form.addRow(self.promote_large)
+        form.addRow(self.show_labels)
         form.addRow("Button size", self.button_size)
         form.addRow("Visible commands / section", self.visible_count)
         form.addRow("Ignored toolbars", self.ignored)
@@ -71,6 +77,7 @@ class PreferencesDialog(QDialog):
         self.enabled.setChecked(prefs.is_enabled())
         self.hide_menubar.setChecked(prefs.hide_menubar())
         self.promote_large.setChecked(prefs.promote_large())
+        self.show_labels.setChecked(prefs.show_button_labels())
         size = prefs.button_size()
         index = self.button_size.findData(size)
         if index < 0:
@@ -83,6 +90,7 @@ class PreferencesDialog(QDialog):
         prefs.set_enabled(self.enabled.isChecked())
         prefs.set_hide_menubar(self.hide_menubar.isChecked())
         prefs.set_promote_large(self.promote_large.isChecked())
+        prefs.set_show_button_labels(self.show_labels.isChecked())
         size = self.button_size.currentData()
         if not size:
             size = self.button_size.currentText().lower()

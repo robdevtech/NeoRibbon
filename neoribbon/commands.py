@@ -90,11 +90,35 @@ class _ToggleLargeIconCommand:
         return True
 
 
+class _ToggleButtonLabelsCommand:
+    def GetResources(self):
+        return {
+            "Pixmap": _icon_path("NeoRibbon.svg"),
+            "MenuText": "Toggle button text labels",
+            "ToolTip": (
+                "Show or hide text labels on ribbon focus buttons "
+                "(section dropdowns always keep labels)"
+            ),
+        }
+
+    def Activated(self):
+        from neoribbon import bootstrap, prefs
+
+        enabled = prefs.toggle_show_button_labels()
+        bootstrap.apply_prefs()
+        state = "on" if enabled else "off"
+        App.Console.PrintMessage(f"NeoRibbon button text labels {state}\n")
+
+    def IsActive(self):
+        return True
+
+
 def register() -> None:
     commands = {
         "NeoRibbon_Toggle": _ToggleCommand(),
         "NeoRibbon_Preferences": _PreferencesCommand(),
         "NeoRibbon_ToggleLargeIcon": _ToggleLargeIconCommand(),
+        "NeoRibbon_ToggleButtonLabels": _ToggleButtonLabelsCommand(),
         "NeoRibbon_RestoreToolbars": _RestoreToolbarsCommand(),
     }
     for name, command in commands.items():
@@ -111,6 +135,7 @@ def register() -> None:
                 [
                     "NeoRibbon_Toggle",
                     "NeoRibbon_ToggleLargeIcon",
+                    "NeoRibbon_ToggleButtonLabels",
                     "NeoRibbon_Preferences",
                     "NeoRibbon_RestoreToolbars",
                 ],

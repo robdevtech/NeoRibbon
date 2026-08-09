@@ -54,7 +54,6 @@ class DensityStyle:
     small_btn_height: int
     small_btn_min_width: int
     large_btn_min_width: int
-    small_show_text: bool
     label_chars: int
 
 
@@ -70,7 +69,6 @@ DENSITY_STYLES: dict[str, DensityStyle] = {
         small_btn_height=20,
         small_btn_min_width=22,
         large_btn_min_width=44,
-        small_show_text=False,
         label_chars=10,
     ),
     "medium": DensityStyle(
@@ -84,7 +82,6 @@ DENSITY_STYLES: dict[str, DensityStyle] = {
         small_btn_height=22,
         small_btn_min_width=72,
         large_btn_min_width=52,
-        small_show_text=True,
         label_chars=11,
     ),
     "large": DensityStyle(
@@ -98,7 +95,6 @@ DENSITY_STYLES: dict[str, DensityStyle] = {
         small_btn_height=48,
         small_btn_min_width=100,
         large_btn_min_width=76,
-        small_show_text=True,
         label_chars=14,
     ),
 }
@@ -164,6 +160,23 @@ def _short_label(text: str, limit: int = 14) -> str:
     if len(cleaned) <= limit:
         return cleaned
     return cleaned[: max(0, limit - 1)] + "…"
+
+
+def _command_shortcut(command_name: str) -> str:
+    """Return FreeCAD's shortcut string for a command, or empty if none."""
+    if not command_name:
+        return ""
+    try:
+        command = Gui.Command.get(command_name)
+        if command is None:
+            return ""
+        shortcut = command.getShortcut()
+        if shortcut:
+            return str(shortcut).strip()
+        info = command.getInfo() or {}
+        return str(info.get("shortcut") or "").strip()
+    except Exception:
+        return ""
 
 
 def _workbench_icon(icon_name: str) -> QIcon:
@@ -374,7 +387,7 @@ class SectionListPopup(QFrame):
         self._list.setObjectName("NeoRibbon_section_list_view")
         self._list.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self._list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._list.setMinimumWidth(320)
+        self._list.setMinimumWidth(360)
         self._list.setMaximumHeight(320)
         root.addWidget(self._list)
 
@@ -436,9 +449,13 @@ class SectionListPopup(QFrame):
         run_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         run_btn.setIcon(_icon_for(command))
         run_btn.setIconSize(LIST_ICON)
+        # Section dropdowns always keep text labels.
         run_btn.setText(command.text or command.name)
         tip = command.tooltip or command.text or command.name
         count = usage.usage_count(command.name)
+        shortcut = _command_shortcut(command.name)
+        if shortcut:
+            tip = f"{tip}  ·  {shortcut}"
         if count:
             tip = f"{tip}  ·  used {count}×"
         if pinned:
@@ -449,6 +466,15 @@ class SectionListPopup(QFrame):
         )
         run_btn.clicked.connect(lambda _c=False, n=command.name: self._activate(n))
         layout.addWidget(run_btn, 1)
+
+        if shortcut:
+            shortcut_label = QLabel(f"({shortcut})")
+            shortcut_label.setObjectName("NeoRibbon_shortcut")
+            shortcut_label.setAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
+            shortcut_label.setToolTip(f"Shortcut: {shortcut}")
+            layout.addWidget(shortcut_label, 0)
 
         help_btn = QToolButton()
         help_btn.setObjectName("NeoRibbon_help")
@@ -586,30 +612,48 @@ class RibbonGroup(QWidget):
         hide_btn.clicked.connect(self._hide_section)
         row.addWidget(hide_btn, 0)
 
+        # Rest of the footer opens the section list (title + ▾ + empty space).
+        clickable = QWidget()
+        clickable.setObjectName("NeoRibbon_group_footer_click")
+        clickable.setCursor(Qt.CursorShape.PointingHandCursor)
+        clickable.setToolTip(
+            f"Show all “{name}” commands as a list (with pin to focus)"
+        )
+        click_row = QHBoxLayout(clickable)
+        click_row.setContentsMargins(0, 0, 0, 0)
+        click_row.setSpacing(0)
+
         title = QLabel(_short_label(name, 14))
         title.setObjectName("NeoRibbon_group_title")
         title.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         title.setFont(label_font)
-        title.setToolTip(name)
-        row.addWidget(title, 1)
+        title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        click_row.addWidget(title, 1)
 
         drop_btn = QToolButton()
         drop_btn.setObjectName("NeoRibbon_section_drop")
         drop_btn.setAutoRaise(True)
         drop_btn.setText("▾")
         drop_btn.setFont(label_font)
-        drop_btn.setToolTip(
-            f"Show all “{name}” commands as a list (with pin to focus)"
-        )
         drop_btn.setFixedSize(16, style.title_height)
-        drop_btn.clicked.connect(self._open_section_list)
-        row.addWidget(drop_btn, 0)
+        drop_btn.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        click_row.addWidget(drop_btn, 0)
+
+        clickable.mousePressEvent = self._footer_mouse_press  # type: ignore[method-assign]
+        row.addWidget(clickable, 1)
 
         bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         bar.customContextMenuRequested.connect(
             lambda pos, b=bar: self._title_menu(b.mapToGlobal(pos))
         )
         return bar
+
+    def _footer_mouse_press(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._open_section_list()
+            event.accept()
+            return
+        event.ignore()
 
     def _open_section_list(self) -> None:
         if self._popup is not None:
@@ -646,16 +690,12 @@ class RibbonGroup(QWidget):
 
     def _large_button(self, command: RibbonCommand) -> QToolButton:
         style = self._style
+        show_labels = prefs.show_button_labels()
         button = QToolButton()
         button.setObjectName(f"NeoRibbon_btn_{command.name}")
         button.setAutoRaise(True)
-        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         button.setIcon(_icon_for(command))
         button.setIconSize(style.large_icon)
-        label = _short_label(command.text or command.name, style.label_chars + 1)
-        if prefs.is_pinned(self._panel_name, command.name):
-            label = "• " + label
-        button.setText(label)
         tip = command.tooltip or command.text or command.name
         count = usage.usage_count(command.name)
         if count:
@@ -664,13 +704,25 @@ class RibbonGroup(QWidget):
             tip = f"{tip}  ·  pinned"
         button.setToolTip(tip)
         button.setFixedHeight(style.content_height - 4)
-        button.setMinimumWidth(style.large_btn_min_width)
+        if show_labels:
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            label = _short_label(command.text or command.name, style.label_chars + 1)
+            if prefs.is_pinned(self._panel_name, command.name):
+                label = "• " + label
+            button.setText(label)
+            button.setMinimumWidth(style.large_btn_min_width)
+        else:
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            button.setText("")
+            side = max(style.large_icon.width() + 12, style.content_height - 8)
+            button.setFixedWidth(side)
         button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self._wire_command_button(button, command)
         return button
 
     def _small_button(self, command: RibbonCommand) -> QToolButton:
         style = self._style
+        show_labels = prefs.show_button_labels()
         button = QToolButton()
         button.setObjectName(f"NeoRibbon_btn_{command.name}")
         button.setAutoRaise(True)
@@ -683,7 +735,7 @@ class RibbonGroup(QWidget):
             tip = f"{tip}  ·  used {count}×"
         if pinned:
             tip = f"{tip}  ·  pinned"
-        if style.small_show_text:
+        if show_labels:
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
             text = _short_label(command.text or command.name, style.label_chars)
             if pinned:
@@ -694,7 +746,8 @@ class RibbonGroup(QWidget):
         else:
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
             button.setText("")
-            button.setFixedSize(style.small_btn_min_width + 2, style.small_btn_height)
+            side = max(style.small_icon.width() + 8, style.small_btn_height)
+            button.setFixedSize(side, style.small_btn_height)
         button.setToolTip(tip)
         self._wire_command_button(button, command)
         return button
@@ -887,6 +940,7 @@ class RibbonBar(QWidget):
         style = density_style()
         density = style.name
         promote = prefs.promote_large()
+        show_labels = prefs.show_button_labels()
         hidden = prefs.hidden_sections()
         limit = prefs.visible_per_section()
         pins = prefs.pins_signature()
@@ -903,6 +957,7 @@ class RibbonBar(QWidget):
         signature = (
             density,
             promote,
+            show_labels,
             limit,
             tuple(sorted(hidden)),
             pins,

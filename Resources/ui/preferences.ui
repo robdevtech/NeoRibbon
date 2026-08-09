@@ -60,6 +60,25 @@
     </widget>
    </item>
    <item>
+    <widget class="Gui::PrefCheckBox" name="checkShowButtonLabels">
+     <property name="text">
+      <string>Text labels on ribbon buttons</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+     <property name="toolTip">
+      <string>When off, the focus strip shows icons only. Section dropdown lists always keep text labels.</string>
+     </property>
+     <property name="prefEntry" stdset="0">
+      <cstring>ShowButtonLabels</cstring>
+     </property>
+     <property name="prefPath" stdset="0">
+      <cstring>Mod/NeoRibbon</cstring>
+     </property>
+    </widget>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="sizeLayout">
      <item>
       <widget class="QLabel" name="labelSize">

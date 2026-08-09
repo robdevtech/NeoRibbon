@@ -121,6 +121,22 @@ def toggle_promote_large() -> bool:
     return value
 
 
+def show_button_labels() -> bool:
+    """Show text labels beside/under focus-strip icons (section lists always labeled)."""
+    return _group().GetBool("ShowButtonLabels", True)
+
+
+def set_show_button_labels(value: bool) -> None:
+    _group().SetBool("ShowButtonLabels", bool(value))
+
+
+def toggle_show_button_labels() -> bool:
+    """Toggle focus-strip text labels. Returns the new value."""
+    value = not show_button_labels()
+    set_show_button_labels(value)
+    return value
+
+
 def visible_per_section() -> int:
     value = int(_group().GetInt("VisiblePerSection", DEFAULT_VISIBLE_PER_SECTION))
     return max(1, min(24, value))

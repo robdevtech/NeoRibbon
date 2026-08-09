@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+
+  <name>NeoRibbon</name>
+
+  <description>Lightweight ribbon UI for FreeCAD. Mirrors the active workbench toolbars with no external dependencies.</description>
+
+  <version>0.1.0</version>
+
+  <date>2026-08-08</date>
+
+  <maintainer email="therobdev@pm.me">Rob</maintainer>
+
+  <license file="LICENSE">LGPL-2.1-or-later</license>
+
+  <pythonmin>3.10.0</pythonmin>
+
+  <url type="repository" branch="master">https://github.com/robdevtech/NeoRibbon</url>
+
+  <url type="readme">https://github.com/robdevtech/NeoRibbon/blob/master/README.md</url>
+
+  <content>
+    <workbench>
+      <freecadmin>1.1.0</freecadmin>
+      <icon>Resources/icons/NeoRibbon.svg</icon>
+      <subdirectory>./</subdirectory>
+    </workbench>
+  </content>
+
+</package>

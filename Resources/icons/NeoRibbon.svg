@@ -1,10 +1,103 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect x="4" y="10" width="56" height="44" rx="4" stroke="#2b5a8a" stroke-width="3" fill="#e8eef5"/>
-  <rect x="8" y="14" width="12" height="8" rx="1" fill="#2b5a8a"/>
-  <rect x="22" y="14" width="12" height="8" rx="1" fill="#4a7aaa"/>
-  <rect x="36" y="14" width="12" height="8" rx="1" fill="#4a7aaa"/>
-  <rect x="10" y="28" width="10" height="20" rx="1" fill="#2b5a8a"/>
-  <rect x="24" y="34" width="10" height="14" rx="1" fill="#4a7aaa"/>
-  <rect x="38" y="34" width="10" height="14" rx="1" fill="#4a7aaa"/>
-  <rect x="52" y="38" width="6" height="10" rx="1" fill="#6a9aca"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 64 64"
+   fill="none"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="NeoRibbon.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs8" />
+  <sodipodi:namedview
+     id="namedview8"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="10.3125"
+     inkscape:cx="31.951515"
+     inkscape:cy="32"
+     inkscape:window-width="1440"
+     inkscape:window-height="888"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg8" />
+  <rect
+     x="4"
+     y="10"
+     width="56"
+     height="44"
+     rx="4"
+     stroke="#2b5a8a"
+     stroke-width="3"
+     fill="#e8eef5"
+     id="rect1"
+     style="fill:#c5d4e6;fill-opacity:1;stroke:#20466a;stroke-opacity:1" />
+  <rect
+     x="10"
+     y="14"
+     width="10"
+     height="34"
+     rx="1"
+     fill="#2b5a8a"
+     id="rect5"
+     style="stroke-width:1.30384" />
+  <rect
+     x="32.666668"
+     y="34"
+     width="10"
+     height="14"
+     rx="1"
+     fill="#4a7aaa"
+     id="rect7" />
+  <rect
+     x="-31.333334"
+     y="34"
+     width="10"
+     height="14"
+     rx="1"
+     fill="#4a7aaa"
+     id="rect11"
+     transform="scale(-1,1)" />
+  <rect
+     x="44"
+     y="34"
+     width="10"
+     height="14"
+     rx="1"
+     fill="#4a7aaa"
+     id="rect12" />
+  <rect
+     x="32.666668"
+     y="14"
+     width="10"
+     height="14"
+     rx="1"
+     fill="#4a7aaa"
+     id="rect13" />
+  <rect
+     x="-31.333334"
+     y="14"
+     width="10"
+     height="14"
+     rx="1"
+     fill="#4a7aaa"
+     id="rect14"
+     transform="scale(-1,1)" />
+  <rect
+     x="44"
+     y="14"
+     width="10"
+     height="14"
+     rx="1"
+     fill="#4a7aaa"
+     id="rect15" />
 </svg>

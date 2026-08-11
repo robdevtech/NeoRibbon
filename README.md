@@ -95,7 +95,7 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 
 ## Design notes
 
-- Content type in `package.xml` is **`other`** (not a Workbench class): the Mod loads from `InitGui.py` and attaches a top dock.
+- Content type in `package.xml` is declared as **`workbench`** so FreeCAD runs `InitGui.py` at startup (NeoRibbon is still an InitGui-only Mod, not a Workbench class).
 - Only the **active** workbench is inspected (`getToolbarItems`). Other workbenches are never activated for caching.
 - Ribbon widgets are plain Qt (`QDockWidget`, `QToolButton`, etc.).
 - Classic toolbars are tracked and restored on toggle-off / uninstall path / recovery command.

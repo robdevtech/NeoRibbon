@@ -141,21 +141,44 @@ class ToolbarController(QObject):
 
         return False
 
+    def show_menubar(self) -> None:
+        """Always show the main-window menu bar (escape / restore path)."""
+        mw = self._main_window()
+        menubar = mw.menuBar()
+        if menubar is None:
+            return
+        menubar.show()
+        try:
+            menubar.setVisible(True)
+        except Exception:
+            pass
+        self._menubar_was_visible = None
+
     def apply_menubar(self, hide: bool) -> None:
+        """
+        Hide or show the FreeCAD menu bar.
+
+        When *hide* is False we always show — never restore a remembered
+        "was hidden" state. That previously stranded users if the bar was
+        already invisible when first hidden, or after a partial restore.
+        """
         mw = self._main_window()
         menubar = mw.menuBar()
         if menubar is None:
             return
         if hide:
             if self._menubar_was_visible is None:
-                self._menubar_was_visible = menubar.isVisible()
+                self._menubar_was_visible = True
+            was_visible = menubar.isVisible()
             menubar.hide()
+            if was_visible:
+                App.Console.PrintMessage(
+                    "NeoRibbon: menu bar hidden. Recovery: Ctrl+Shift+M "
+                    "(show menu), Ctrl+Shift+R (classic UI), or "
+                    "scripts/restore_menubar.py from a terminal.\n"
+                )
         else:
-            if self._menubar_was_visible is not None:
-                menubar.setVisible(self._menubar_was_visible)
-            else:
-                menubar.show()
-            self._menubar_was_visible = None
+            self.show_menubar()
 
     def restore(self) -> None:
         self.disable_guard()
@@ -168,11 +191,11 @@ class ToolbarController(QObject):
                 restored += 1
         self._hidden_names.clear()
         self._hidden_anon.clear()
-        self.apply_menubar(False)
+        self.show_menubar()
         App.Console.PrintLog(f"NeoRibbon: restored {restored} toolbars\n")
 
     def restore_all_toolbars(self) -> None:
-        """Emergency recovery: show every non-NeoRibbon toolbar."""
+        """Emergency recovery: show every non-NeoRibbon toolbar + menu bar."""
         self.disable_guard()
         mw = self._main_window()
         for toolbar in mw.findChildren(QToolBar):
@@ -182,8 +205,5 @@ class ToolbarController(QObject):
             toolbar.show()
         self._hidden_names.clear()
         self._hidden_anon.clear()
-        menubar = mw.menuBar()
-        if menubar is not None:
-            menubar.show()
-        self._menubar_was_visible = None
+        self.show_menubar()
         App.Console.PrintMessage("NeoRibbon: all classic toolbars restored\n")

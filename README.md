@@ -23,9 +23,22 @@ This is reversible at any time:
 
 | Goal | Action |
 |------|--------|
-| Turn NeoRibbon off | **Tools → Toggle NeoRibbon** |
-| Force classic toolbars back | **Tools → Restore classic toolbars** |
-| Preferences | **Edit → Preferences → NeoRibbon** or **Tools → NeoRibbon preferences…** |
+| Turn NeoRibbon off | **Tools → Toggle NeoRibbon** or **Ctrl+Shift+N** |
+| Show menu bar only | **Ctrl+Shift+M** (clears HideMenubar; ribbon stays on) |
+| Force classic toolbars + menu bar | **Tools → Restore classic toolbars** or **Ctrl+Shift+R** |
+| Preferences | **Edit → Preferences → NeoRibbon**, **Tools → NeoRibbon preferences…**, or **Ctrl+Shift+,** |
+
+**Stuck with no menu bar?** Prefer **Ctrl+Shift+M** (show menu) or **Ctrl+Shift+R** (classic UI). Or from a terminal:
+
+```bash
+# Flatpak
+flatpak run org.freecad.FreeCAD /path/to/NeoRibbon/scripts/restore_menubar.py
+
+# Native
+freecad /path/to/NeoRibbon/scripts/restore_menubar.py
+```
+
+If FreeCAD is fully quit, you can also set `HideMenubar` to `0` under `Mod/NeoRibbon` in `user.cfg` (see `scripts/clear_hide_menubar_cfg.py`).
 
 NeoRibbon does not phone home or send telemetry. Preferences and usage counts stay in FreeCAD’s local parameter store (`User parameter:BaseApp/Preferences/Mod/NeoRibbon`).
 
@@ -73,11 +86,11 @@ After this addon is accepted into the official Addon Index, it will also appear 
 
 | Action | How |
 |--------|-----|
-| Toggle ribbon | **Tools → Toggle NeoRibbon** (or run `NeoRibbon_Toggle`) |
+| Toggle ribbon | **Tools → Toggle NeoRibbon** / **Ctrl+Shift+N** (`NeoRibbon_Toggle`) |
 | Toggle large section icon | **Tools → Toggle large section icon** (`NeoRibbon_ToggleLargeIcon`) |
 | Toggle button text labels | **Tools → Toggle button text labels** (`NeoRibbon_ToggleButtonLabels`) |
-| Preferences | **Tools → NeoRibbon preferences…** or **Edit → Preferences → NeoRibbon** |
-| Emergency toolbar restore | **Tools → Restore classic toolbars** (`NeoRibbon_RestoreToolbars`) |
+| Preferences | **Tools → NeoRibbon preferences…** / **Ctrl+Shift+,** or **Edit → Preferences → NeoRibbon** |
+| Emergency toolbar + menu restore | **Tools → Restore classic toolbars** / **Ctrl+Shift+R** (`NeoRibbon_RestoreToolbars`) |
 
 Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 
@@ -87,7 +100,7 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 - **Button size** — `small` \| `medium` \| `large`
 - **Visible commands / section** — most-used commands shown as buttons (default 6); the rest are under **More ▾**
 - **Ignored toolbars** — semicolon-separated FreeCAD toolbar names to skip permanently
-- **Hide menu bar** — optional; default off
+- **Hide menu bar** — optional; default off (if stuck: **Ctrl+Shift+R**)
 
 **Sections:** click the section footer (except **×**) for a full labeled command list (with shortcuts in parentheses when set); use the **pin** on each row to keep that command in the focus strip. **×** hides the section; **Sections ▾** manages visibility.
 

@@ -9,6 +9,7 @@ from typing import Optional
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide.QtCore import QTimer, Qt
+from PySide.QtGui import QKeySequence, QShortcut
 from PySide.QtWidgets import QMainWindow, QToolBar
 
 from neoribbon import prefs
@@ -22,6 +23,7 @@ _installed = False
 _refresh_pending = False
 _pref_observer = None
 _pref_apply_pending = False
+_escape_shortcuts: list = []
 
 # Keys written by Edit → Preferences → NeoRibbon (and Tools dialog).
 _PREF_PAGE_KEYS = frozenset(
@@ -146,13 +148,67 @@ def toggle() -> None:
 
 
 def restore_toolbars() -> None:
+    """Emergency recovery: classic toolbars + menu bar, ribbon off."""
     global _controller
     if _controller is None:
         _controller = ToolbarController()
-    _controller.restore_all_toolbars()
+    prefs.set_hide_menubar(False)
     prefs.set_enabled(False)
+    _controller.restore_all_toolbars()
     if _dock is not None:
         _dock.hide()
+    App.Console.PrintMessage(
+        "NeoRibbon: restored classic UI (toolbars + menu bar); ribbon disabled\n"
+    )
+
+
+def show_menubar_escape() -> None:
+    """Show the menu bar and clear HideMenubar; leave the ribbon as-is."""
+    global _controller
+    prefs.set_hide_menubar(False)
+    if _controller is None:
+        _controller = ToolbarController()
+    _controller.show_menubar()
+    App.Console.PrintMessage(
+        "NeoRibbon: menu bar shown (HideMenubar cleared). "
+        "Ctrl+Shift+R restores classic toolbars if needed.\n"
+    )
+
+
+def _register_escape_shortcuts() -> None:
+    """
+    Application-wide shortcuts that work when the menu bar is hidden.
+
+    FreeCAD Accel on Tools menu actions often stops firing once the menu bar
+    is hidden; QShortcut(ApplicationShortcut) remains available.
+    """
+    global _escape_shortcuts
+    if _escape_shortcuts:
+        return
+    mw = _main_window()
+    bindings = (
+        ("Ctrl+Shift+M", show_menubar_escape, "NeoRibbon show menu bar"),
+        ("Ctrl+Shift+R", restore_toolbars, "NeoRibbon restore classic UI"),
+        ("Ctrl+Shift+N", toggle, "NeoRibbon toggle"),
+        (
+            "Ctrl+Shift+,",
+            lambda: __import__(
+                "neoribbon.prefs_dialog", fromlist=["open_preferences_dialog"]
+            ).open_preferences_dialog(),
+            "NeoRibbon preferences",
+        ),
+    )
+    for seq, slot, label in bindings:
+        try:
+            shortcut = QShortcut(QKeySequence(seq), mw)
+            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            shortcut.activated.connect(slot)
+            _escape_shortcuts.append(shortcut)
+            App.Console.PrintLog(f"NeoRibbon: shortcut {seq} → {label}\n")
+        except Exception as exc:  # noqa: BLE001
+            App.Console.PrintWarning(
+                f"NeoRibbon: could not register {seq}: {exc}\n"
+            )
 
 
 def _resources_dir() -> str:
@@ -195,6 +251,7 @@ def install() -> None:
 
     register_commands()
     _register_preference_page()
+    _register_escape_shortcuts()
     _controller = ToolbarController()
 
     _pref_observer = _PrefObserver()
@@ -227,6 +284,7 @@ def install() -> None:
 def uninstall() -> None:
     """Restore classic UI and disconnect signals."""
     global _installed, _dock, _controller, _refresh_pending, _pref_observer
+    global _escape_shortcuts
     if not _installed:
         return
     mw = _main_window()
@@ -240,6 +298,13 @@ def uninstall() -> None:
         except Exception:
             pass
         _pref_observer = None
+    for shortcut in _escape_shortcuts:
+        try:
+            shortcut.setParent(None)
+            shortcut.deleteLater()
+        except Exception:
+            pass
+    _escape_shortcuts = []
     _hide_ribbon(restore_toolbars=True)
     if _dock is not None:
         mw.removeDockWidget(_dock)

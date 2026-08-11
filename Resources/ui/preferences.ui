@@ -35,6 +35,9 @@
      <property name="text">
       <string>Hide menu bar while ribbon is enabled</string>
      </property>
+     <property name="toolTip">
+      <string>Escape hatch: Ctrl+Shift+M shows the menu bar; Ctrl+Shift+R restores classic toolbars (both work when menus are hidden). Ctrl+Shift+N toggles NeoRibbon.</string>
+     </property>
      <property name="prefEntry" stdset="0">
       <cstring>HideMenubar</cstring>
      </property>
@@ -174,7 +177,7 @@
    <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
-      <string>Each section shows your most-used commands; the rest are under More. Hide sections with × or Sections. Button size changes icon and ribbon height.</string>
+      <string>Each section shows your most-used commands; the rest are under More. Hide sections with × or Sections. If the menu bar is hidden: Ctrl+Shift+M shows it; Ctrl+Shift+R restores classic toolbars.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>

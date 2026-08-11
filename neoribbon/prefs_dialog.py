@@ -11,6 +11,7 @@ from PySide.QtWidgets import (
     QFormLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QSpinBox,
     QVBoxLayout,
 )
@@ -23,10 +24,15 @@ class PreferencesDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("NeoRibbon")
         self.setModal(True)
-        self.resize(440, 280)
+        self.resize(440, 300)
 
         self.enabled = QCheckBox("Enable ribbon")
         self.hide_menubar = QCheckBox("Hide menu bar while ribbon is enabled")
+        self.hide_menubar.setToolTip(
+            "Escape hatch if the menu bar disappears: Ctrl+Shift+M shows the "
+            "menu bar; Ctrl+Shift+R restores classic toolbars. "
+            "Ctrl+Shift+N toggles NeoRibbon."
+        )
         self.promote_large = QCheckBox("Large icon for first command in each section")
         self.show_labels = QCheckBox("Text labels on ribbon buttons")
         self.show_labels.setToolTip(
@@ -56,7 +62,8 @@ class PreferencesDialog(QDialog):
         hint = QLabel(
             "Each section shows your most-used commands; extras are under More. "
             "Hide sections with × on the section title, or Sections ▾. "
-            "Usage ranking updates when the ribbon refreshes (workbench switch)."
+            "If the menu bar is hidden: Ctrl+Shift+M shows it; "
+            "Ctrl+Shift+R restores classic toolbars."
         )
         hint.setWordWrap(True)
 
@@ -87,8 +94,23 @@ class PreferencesDialog(QDialog):
         self.ignored.setText(prefs.ignored_toolbars_text())
 
     def apply(self) -> None:
+        hide = self.hide_menubar.isChecked()
+        if hide and not prefs.hide_menubar():
+            answer = QMessageBox.question(
+                self,
+                "Hide FreeCAD menu bar?",
+                "This hides Edit/Tools/View until NeoRibbon restores them.\n\n"
+                "Remember: Ctrl+Shift+M shows the menu bar; Ctrl+Shift+R "
+                "restores classic toolbars — both work with menus gone.\n\n"
+                "Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self.hide_menubar.setChecked(False)
+                hide = False
         prefs.set_enabled(self.enabled.isChecked())
-        prefs.set_hide_menubar(self.hide_menubar.isChecked())
+        prefs.set_hide_menubar(hide)
         prefs.set_promote_large(self.promote_large.isChecked())
         prefs.set_show_button_labels(self.show_labels.isChecked())
         size = self.button_size.currentData()

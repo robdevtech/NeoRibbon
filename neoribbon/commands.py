@@ -24,7 +24,8 @@ class _ToggleCommand:
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "Toggle NeoRibbon",
-            "ToolTip": "Enable or disable the NeoRibbon dock",
+            "ToolTip": "Enable or disable the NeoRibbon dock (Ctrl+Shift+N)",
+            "Accel": "Ctrl+Shift+N",
         }
 
     def Activated(self):
@@ -41,7 +42,8 @@ class _PreferencesCommand:
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "NeoRibbon preferences…",
-            "ToolTip": "Open NeoRibbon settings",
+            "ToolTip": "Open NeoRibbon settings (Ctrl+Shift+,)",
+            "Accel": "Ctrl+Shift+,",
         }
 
     def Activated(self):
@@ -58,7 +60,11 @@ class _RestoreToolbarsCommand:
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "Restore classic toolbars",
-            "ToolTip": "Show FreeCAD toolbars hidden by NeoRibbon",
+            "ToolTip": (
+                "Show FreeCAD toolbars and menu bar hidden by NeoRibbon "
+                "(Ctrl+Shift+R — works even if the menu bar is hidden)"
+            ),
+            "Accel": "Ctrl+Shift+R",
         }
 
     def Activated(self):

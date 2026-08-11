@@ -11,7 +11,33 @@ Lightweight Office/Fusion-style ribbon for **FreeCAD 1.1+**. The active workbenc
 - FreeCAD **1.1.0** or newer (Qt6 / PySide via FreeCAD’s `PySide` wrapper)
 - No other dependencies
 
+## Important: UI replacement
+
+While NeoRibbon is **enabled**, it intentionally changes FreeCAD’s main-window chrome:
+
+- Classic **toolbars** for the active UI are hidden (mirrored into the ribbon instead)
+- Optional: hide the **menu bar** (off by default; Preferences)
+- FreeCAD’s workbench selector moves into the ribbon’s **Workbench** control
+
+This is reversible at any time:
+
+| Goal | Action |
+|------|--------|
+| Turn NeoRibbon off | **Tools → Toggle NeoRibbon** |
+| Force classic toolbars back | **Tools → Restore classic toolbars** |
+| Preferences | **Edit → Preferences → NeoRibbon** or **Tools → NeoRibbon preferences…** |
+
+NeoRibbon does not phone home or send telemetry. Preferences and usage counts stay in FreeCAD’s local parameter store (`User parameter:BaseApp/Preferences/Mod/NeoRibbon`).
+
 ## Install
+
+### Addon Manager (git URL)
+
+1. **Tools → Addon manager**
+2. Install from repository: `https://github.com/robdevtech/NeoRibbon`
+3. Restart FreeCAD when prompted
+
+After this addon is accepted into the official Addon Index, it will also appear in the Addon Manager browse list.
 
 ### Manual (development)
 
@@ -43,10 +69,6 @@ Lightweight Office/Fusion-style ribbon for **FreeCAD 1.1+**. The active workbenc
 
 3. Confirm the Report View shows `NeoRibbon installed` (log level) and a **NeoRibbon** dock appears at the top.
 
-### Addon Manager
-
-When published, install via **Tools → Addon manager**. Until then, use the manual path above.
-
 ## Usage
 
 | Action | How |
@@ -67,14 +89,15 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 - **Ignored toolbars** — semicolon-separated FreeCAD toolbar names to skip permanently
 - **Hide menu bar** — optional; default off
 
-**Sections:** click **×** to hide a section, or use **Sections ▾**. Click **▾** under a section for a full labeled command list (with shortcuts in parentheses when set); use the **pin** on each row to keep that command in the focus strip.
+**Sections:** click the section footer (except **×**) for a full labeled command list (with shortcuts in parentheses when set); use the **pin** on each row to keep that command in the focus strip. **×** hides the section; **Sections ▾** manages visibility.
 
 **Workbench:** NeoRibbon hides the classic toolbar that held FreeCAD’s workbench combo. Use the **Workbench** control at the **left** of the ribbon instead.
 
 ## Design notes
 
+- Content type in `package.xml` is **`other`** (not a Workbench class): the Mod loads from `InitGui.py` and attaches a top dock.
 - Only the **active** workbench is inspected (`getToolbarItems`). Other workbenches are never activated for caching.
-- Ribbon widgets are plain Qt (`QDockWidget`, `QTabWidget`, `QToolButton`).
+- Ribbon widgets are plain Qt (`QDockWidget`, `QToolButton`, etc.).
 - Classic toolbars are tracked and restored on toggle-off / uninstall path / recovery command.
 
 ## Manual test checklist (FreeCAD 1.1+)
@@ -93,7 +116,7 @@ flatpak run org.freecad.FreeCAD /path/to/NeoRibbon/scripts/smoke_gui.py
 # expect: NeoRibbon smoke: dock=True / installed=True / panels>0
 ```
 
+## Support
 
-## License
-
-LGPL-2.1-or-later — see [LICENSE](LICENSE).
+- Issues: https://github.com/robdevtech/NeoRibbon/issues
+- License: LGPL-2.1-or-later — see [LICENSE](LICENSE)

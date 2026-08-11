@@ -3,7 +3,7 @@
 
   <name>NeoRibbon</name>
 
-  <description>Lightweight ribbon UI for FreeCAD. Mirrors the active workbench toolbars with no external dependencies.</description>
+  <description>Lightweight ribbon UI for FreeCAD 1.1+. Maps the active workbench toolbars into a compact top ribbon, hides classic toolbars while enabled, and restores them on disable. No external Python dependencies.</description>
 
   <version>0.1.0</version>
 
@@ -15,16 +15,24 @@
 
   <pythonmin>3.10.0</pythonmin>
 
+  <icon>Resources/icons/NeoRibbon.svg</icon>
+
   <url type="repository" branch="master">https://github.com/robdevtech/NeoRibbon</url>
 
   <url type="readme">https://github.com/robdevtech/NeoRibbon/blob/master/README.md</url>
 
+  <url type="bugtracker">https://github.com/robdevtech/NeoRibbon/issues</url>
+
   <content>
-    <workbench>
+    <!--
+      Not a FreeCAD Workbench class — loads via InitGui.py as a Mod that
+      augments the main window. Use content type "other" (FreeCAD 1.1+).
+    -->
+    <other>
       <freecadmin>1.1.0</freecadmin>
       <icon>Resources/icons/NeoRibbon.svg</icon>
       <subdirectory>./</subdirectory>
-    </workbench>
+    </other>
   </content>
 
 </package>

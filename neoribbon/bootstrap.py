@@ -29,7 +29,6 @@ _escape_shortcuts: list = []
 _PREF_PAGE_KEYS = frozenset(
     {
         "Enabled",
-        "HideMenubar",
         "PromoteLarge",
         "ShowButtonLabels",
         "ButtonSize",
@@ -82,7 +81,7 @@ def _on_workbench_activated(_name: str = "") -> None:
             if _controller is not None:
                 _controller.enable_guard()
                 _controller.hide_classic_deferred()
-                _controller.apply_menubar(prefs.hide_menubar())
+                _controller.show_menubar()
             if _dock is not None:
                 _dock.refresh()
         except Exception as exc:  # noqa: BLE001
@@ -114,7 +113,7 @@ def _show_ribbon() -> None:
         _controller = ToolbarController()
     _controller.enable_guard()
     _controller.hide_classic_deferred()
-    _controller.apply_menubar(prefs.hide_menubar())
+    _controller.show_menubar()
     dock.refresh()
 
 
@@ -135,7 +134,7 @@ def apply_prefs() -> None:
         if _dock is not None:
             _dock.refresh(force=True)
         if _controller is not None:
-            _controller.apply_menubar(prefs.hide_menubar())
+            _controller.show_menubar()
     else:
         _hide_ribbon(restore_toolbars=True)
 
@@ -152,7 +151,7 @@ def restore_toolbars() -> None:
     global _controller
     if _controller is None:
         _controller = ToolbarController()
-    prefs.set_hide_menubar(False)
+    prefs.clear_legacy_hide_menubar()
     prefs.set_enabled(False)
     _controller.restore_all_toolbars()
     if _dock is not None:
@@ -162,32 +161,18 @@ def restore_toolbars() -> None:
     )
 
 
-def show_menubar_escape() -> None:
-    """Show the menu bar and clear HideMenubar; leave the ribbon as-is."""
-    global _controller
-    prefs.set_hide_menubar(False)
-    if _controller is None:
-        _controller = ToolbarController()
-    _controller.show_menubar()
-    App.Console.PrintMessage(
-        "NeoRibbon: menu bar shown (HideMenubar cleared). "
-        "Ctrl+Shift+R restores classic toolbars if needed.\n"
-    )
-
-
 def _register_escape_shortcuts() -> None:
     """
-    Application-wide shortcuts that work when the menu bar is hidden.
+    Application-wide shortcuts for NeoRibbon commands.
 
-    FreeCAD Accel on Tools menu actions often stops firing once the menu bar
-    is hidden; QShortcut(ApplicationShortcut) remains available.
+    FreeCAD Accel on Tools menu actions can be unreliable; QShortcut with
+    ApplicationShortcut stays available.
     """
     global _escape_shortcuts
     if _escape_shortcuts:
         return
     mw = _main_window()
     bindings = (
-        ("Ctrl+Shift+M", show_menubar_escape, "NeoRibbon show menu bar"),
         ("Ctrl+Shift+R", restore_toolbars, "NeoRibbon restore classic UI"),
         ("Ctrl+Shift+N", toggle, "NeoRibbon toggle"),
         (
@@ -253,6 +238,10 @@ def install() -> None:
     _register_preference_page()
     _register_escape_shortcuts()
     _controller = ToolbarController()
+
+    # Older versions could hide the menu bar; clear that and always show it.
+    prefs.clear_legacy_hide_menubar()
+    _controller.show_menubar()
 
     _pref_observer = _PrefObserver()
     try:

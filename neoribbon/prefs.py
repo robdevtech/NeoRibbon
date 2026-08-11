@@ -97,12 +97,16 @@ def set_button_size(value: str) -> None:
     group.SetInt("ButtonSize", BUTTON_SIZES.index(size))
 
 
-def hide_menubar() -> bool:
-    return _group().GetBool("HideMenubar", False)
-
-
-def set_hide_menubar(value: bool) -> None:
-    _group().SetBool("HideMenubar", bool(value))
+def clear_legacy_hide_menubar() -> None:
+    """Drop obsolete HideMenubar param from older NeoRibbon versions."""
+    group = _group()
+    try:
+        group.RemBool("HideMenubar")
+    except Exception:
+        try:
+            group.SetBool("HideMenubar", False)
+        except Exception:
+            pass
 
 
 def promote_large() -> bool:

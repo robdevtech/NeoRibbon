@@ -61,8 +61,8 @@ class _RestoreToolbarsCommand:
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "Restore classic toolbars",
             "ToolTip": (
-                "Show FreeCAD toolbars and menu bar hidden by NeoRibbon "
-                "(Ctrl+Shift+R — works even if the menu bar is hidden)"
+                "Show FreeCAD toolbars hidden by NeoRibbon "
+                "(Ctrl+Shift+R)"
             ),
             "Accel": "Ctrl+Shift+R",
         }

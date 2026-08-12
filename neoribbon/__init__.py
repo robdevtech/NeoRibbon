@@ -3,4 +3,4 @@
 
 from neoribbon.prefs import addon_version
 
-__version__ = addon_version() or "0.2.5"
+__version__ = addon_version() or "0.2.6"

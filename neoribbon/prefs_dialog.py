@@ -113,7 +113,6 @@ class PreferencesDialog(QDialog):
         version = QLabel(_version_label_text())
         version.setObjectName("labelVersion")
         version.setToolTip("Installed addon version from package.xml")
-        version.setStyleSheet("color: palette(mid);")
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel

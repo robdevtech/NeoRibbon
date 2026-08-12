@@ -171,13 +171,10 @@
    <item>
     <widget class="QLabel" name="labelVersion">
      <property name="text">
-      <string>NeoRibbon 0.2.5</string>
+      <string>NeoRibbon 0.2.6</string>
      </property>
      <property name="toolTip">
       <string>Installed addon version from package.xml</string>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">color: palette(mid);</string>
      </property>
     </widget>
    </item>

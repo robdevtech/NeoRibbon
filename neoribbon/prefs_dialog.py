@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+
 from PySide.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -16,6 +18,54 @@ from PySide.QtWidgets import (
 )
 
 from neoribbon import prefs
+
+
+def _version_label_text() -> str:
+    version = prefs.addon_version()
+    return f"NeoRibbon {version}" if version else "NeoRibbon"
+
+
+def _ui_path() -> str:
+    return os.path.join(prefs.addon_root(), "Resources", "ui", "preferences.ui")
+
+
+class PreferencePage:
+    """Edit → Preferences → NeoRibbon. Apply/OK write params and refresh live."""
+
+    def __init__(self, parent=None) -> None:  # noqa: ARG002
+        import FreeCADGui as Gui
+
+        self.form = Gui.PySideUic.loadUi(_ui_path())
+        self._set_version_label()
+
+    def _set_version_label(self) -> None:
+        label = getattr(self.form, "labelVersion", None)
+        if label is not None:
+            label.setText(_version_label_text())
+
+    def loadSettings(self) -> None:  # noqa: N802 — FreeCAD preference page API
+        form = self.form
+        form.checkEnabled.setChecked(prefs.is_enabled())
+        form.checkPromoteLarge.setChecked(prefs.promote_large())
+        form.checkShowButtonLabels.setChecked(prefs.show_button_labels())
+        form.comboButtonSize.setCurrentIndex(prefs.button_size_index())
+        form.spinVisiblePerSection.setValue(prefs.visible_per_section())
+        form.lineIgnoredToolbars.setText(prefs.ignored_toolbars_text())
+        self._set_version_label()
+
+    def saveSettings(self) -> None:  # noqa: N802 — FreeCAD preference page API
+        form = self.form
+        prefs.set_enabled(form.checkEnabled.isChecked())
+        prefs.set_promote_large(form.checkPromoteLarge.isChecked())
+        prefs.set_show_button_labels(form.checkShowButtonLabels.isChecked())
+        idx = form.comboButtonSize.currentIndex()
+        if 0 <= idx < len(prefs.BUTTON_SIZES):
+            prefs.set_button_size(prefs.BUTTON_SIZES[idx])
+        prefs.set_visible_per_section(form.spinVisiblePerSection.value())
+        prefs.set_ignored_toolbars_text(form.lineIgnoredToolbars.text())
+        from neoribbon import bootstrap
+
+        bootstrap.apply_prefs()
 
 
 class PreferencesDialog(QDialog):
@@ -60,6 +110,11 @@ class PreferencesDialog(QDialog):
         )
         hint.setWordWrap(True)
 
+        version = QLabel(_version_label_text())
+        version.setObjectName("labelVersion")
+        version.setToolTip("Installed addon version from package.xml")
+        version.setStyleSheet("color: palette(mid);")
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -69,6 +124,7 @@ class PreferencesDialog(QDialog):
         root = QVBoxLayout(self)
         root.addLayout(form)
         root.addWidget(hint)
+        root.addWidget(version)
         root.addWidget(buttons)
 
         self._load()

@@ -22,7 +22,7 @@ This is reversible at any time:
 
 | Goal | Action | Restart? |
 |------|--------|----------|
-| Turn NeoRibbon off (keep addon loaded) | **Tools → Toggle NeoRibbon** / **Ctrl+Shift+N**, or uncheck **Enabled** in Preferences | **No** — classic toolbars and the menu bar come back immediately |
+| Turn NeoRibbon off (keep addon loaded) | **Tools → Toggle NeoRibbon** / **Ctrl+Shift+N**, or uncheck **Enable ribbon** in Preferences then **Apply** | **No** — classic toolbars and the menu bar come back immediately |
 | Force classic toolbars back | **Tools → Restore classic toolbars** or **Ctrl+Shift+R** | No |
 | Preferences (size, labels, …) | **Edit → Preferences → NeoRibbon**, **Tools → NeoRibbon preferences…**, or **Ctrl+Shift+,** | No — Apply/OK takes effect immediately |
 | Disable or uninstall via **Addon Manager** | AM writes `ADDON_DISABLED` (or deletes the Mod). NeoRibbon restores classic toolbars in the current session | **Yes** — FreeCAD only unloads/loads Mods at startup. First install and AM Enable also need a restart |
@@ -81,7 +81,8 @@ After this addon is accepted into the official Addon Index, it will also appear 
 
 Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 
-- **Enabled** — show ribbon / hide classic toolbars
+- **Enabled** — show ribbon / hide classic toolbars (**Apply** / **OK** update the live UI)
+- **Version** — `NeoRibbon x.y.z` from `package.xml` (bottom of the preferences page and Tools dialog)
 - **Promote large** — show the first focus command as a large icon per section (default on)
 - **Show button labels** — text beside/under focus-strip icons (default on); section dropdowns always keep labels
 - **Button size** — `small` \| `medium` \| `large`
@@ -100,20 +101,21 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 - Content type in `package.xml` is declared as **`workbench`** so FreeCAD runs `InitGui.py` at startup (NeoRibbon is still an InitGui-only Mod, not a Workbench class).
 - Only the **active** workbench is inspected (`getToolbarItems`). Other workbenches are never activated for caching.
 - Ribbon widgets are plain Qt (`QDockWidget`, `QToolButton`, etc.).
-- Classic toolbars are restored immediately on toggle-off, Preferences **Enabled** off, `uninstall()`, and when Addon Manager writes `ADDON_DISABLED` (file watch — AM has no enable/disable signal in FreeCAD 1.1). Pending hide-timers are cancelled so disable cannot leave an empty toolbar strip. On quit, toolbars are shown again so the next session is not saved with zero chrome if the addon does not load.
+- Classic toolbars are restored immediately on toggle-off, Preferences **Enable ribbon** off (**Apply**/**OK**), `uninstall()`, and when Addon Manager writes `ADDON_DISABLED` (file watch — AM has no enable/disable signal in FreeCAD 1.1). The preference observer keeps a long-lived `ParamGet` handle (a temporary wrapper’s destructor detaches observers). Pending hide-timers are cancelled so disable cannot leave an empty toolbar strip. On quit, toolbars are shown again so the next session is not saved with zero chrome if the addon does not load.
 - **InitGui.py** installs the dock at GUI startup. **Init.py** only retries install if the main window is already up. First Addon Manager install / AM Enable still need a FreeCAD restart.
 
 ## Manual test checklist (FreeCAD 1.1+)
 
 1. Install Mod → ribbon appears; classic toolbars are hidden.
 2. Switch Part / PartDesign / Draft → ribbon panels update without a long delay.
-3. Toggle NeoRibbon off (or run Restore classic toolbars) → toolbars return.
+3. Toggle NeoRibbon off, or uncheck **Enable ribbon** then **Apply** → classic toolbars return immediately.
 4. Set an ignored toolbar name → that tab is omitted after refresh.
 5. Change button size → buttons update on next refresh.
 6. Report View shows no cascade of swallowed exceptions from NeoRibbon.
 7. **Sections ▾ → Reorder sections…** — uncheck a group then OK to hide it; check to show again; drag or move up/down reorders; reset restores workbench order (visibility is kept).
 8. Toggle a checkable command (e.g. Draft snap, Sketcher helper) — ribbon button stays sunken while on.
 9. Scroll the ribbon so a group is near the left/right edge, open its ▾ list — popup stays fully on screen.
+10. **Edit → Preferences → NeoRibbon** shows **NeoRibbon x.y.z** at the bottom; Apply/OK updates the live ribbon.
 
 A short automated GUI probe is in [`scripts/smoke_gui.py`](scripts/smoke_gui.py):
 

@@ -43,13 +43,15 @@ _PREF_PAGE_KEYS = frozenset(
 class _PrefObserver:
     """Re-apply ribbon when FreeCAD preference Pref* widgets save."""
 
-    def onChange(self, _group, name: str) -> None:
-        if name not in _PREF_PAGE_KEYS:
+    def onChange(self, _group, name=None) -> None:
+        key = "" if name is None else str(name)
+        if key not in _PREF_PAGE_KEYS:
             return
         _schedule_apply_prefs()
 
 
 def _schedule_apply_prefs() -> None:
+    """Defer until the current Apply/OK batch finishes writing all Pref* keys."""
     global _pref_apply_pending
     if not _installed or _pref_apply_pending:
         return
@@ -181,19 +183,19 @@ def _hide_ribbon(restore_toolbars: bool = True) -> None:
 
 def apply_prefs() -> None:
     """Re-apply preference values to the live UI (no FreeCAD restart needed)."""
+    global _refresh_pending
     if not _installed:
         return
-    if addon_disabled_by_manager():
+    if addon_disabled_by_manager() or not prefs.is_enabled():
+        # Drop a queued workbench refresh so it cannot re-show after hide.
+        _refresh_pending = False
         _hide_ribbon(restore_toolbars=True)
         return
-    if prefs.is_enabled():
-        _show_ribbon()
-        if _dock is not None:
-            _dock.refresh(force=True)
-        if _controller is not None:
-            _controller.show_menubar()
-    else:
-        _hide_ribbon(restore_toolbars=True)
+    _show_ribbon()
+    if _dock is not None:
+        _dock.refresh(force=True)
+    if _controller is not None:
+        _controller.show_menubar()
 
 
 def toggle() -> None:
@@ -277,9 +279,20 @@ def _register_preference_page() -> None:
         )
 
     try:
-        Gui.addPreferencePage(ui, "NeoRibbon")
+        from neoribbon.prefs_dialog import PreferencePage
+
+        Gui.addPreferencePage(PreferencePage, "NeoRibbon")
     except Exception as exc:  # noqa: BLE001
-        App.Console.PrintWarning(f"NeoRibbon: addPreferencePage failed: {exc}\n")
+        App.Console.PrintWarning(
+            f"NeoRibbon: Python preference page failed ({exc}); "
+            "falling back to UI file\n"
+        )
+        try:
+            Gui.addPreferencePage(ui, "NeoRibbon")
+        except Exception as fallback_exc:  # noqa: BLE001
+            App.Console.PrintWarning(
+                f"NeoRibbon: addPreferencePage failed: {fallback_exc}\n"
+            )
 
 
 def install() -> None:
@@ -300,6 +313,7 @@ def install() -> None:
 
     _pref_observer = _PrefObserver()
     try:
+        # Must keep this ParamGet wrapper; its destructor Detach()es observers.
         prefs.param_group().Attach(_pref_observer)
     except Exception as exc:  # noqa: BLE001
         App.Console.PrintWarning(

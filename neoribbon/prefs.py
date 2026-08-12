@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import xml.etree.ElementTree as ET
 from typing import Iterable
 
 import FreeCAD as App
@@ -13,18 +15,64 @@ BUTTON_SIZES = ("small", "medium", "large")
 DEFAULT_BUTTON_SIZE = "medium"
 DEFAULT_VISIBLE_PER_SECTION = 6
 
+# Keep one ParamGet wrapper alive. ParameterGrpPy::~ParameterGrpPy Detach()es
+# observers, so Attach() on a temporary App.ParamGet(...) is a no-op after GC.
+_group_handle = None
+
+
+def addon_root() -> str:
+    """Addon directory (package.xml / InitGui.py live here)."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def addon_version() -> str:
+    """Version from package.xml next to InitGui — cannot drift from the package."""
+    path = os.path.join(addon_root(), "package.xml")
+    try:
+        root = ET.parse(path).getroot()
+        tag = "version"
+        if root.tag.startswith("{") and "}" in root.tag:
+            tag = f"{root.tag.split('}')[0]}}}version"
+        el = root.find(tag)
+        if el is not None and (el.text or "").strip():
+            return el.text.strip()
+    except Exception:
+        pass
+    return ""
+
 
 def _group():
-    return App.ParamGet(PARAM_PATH)
+    global _group_handle
+    if _group_handle is None:
+        _group_handle = App.ParamGet(PARAM_PATH)
+    return _group_handle
 
 
 def param_group():
-    """Public handle for attaching preference observers."""
+    """Long-lived handle for attaching preference observers."""
     return _group()
 
 
 def is_enabled() -> bool:
-    return _group().GetBool("Enabled", True)
+    group = _group()
+    try:
+        contents = group.GetContents() or ()
+    except Exception:
+        contents = ()
+    for item in contents:
+        try:
+            kind, name, value = item[0], item[1], item[2]
+        except Exception:
+            continue
+        if name != "Enabled":
+            continue
+        if kind == "Boolean":
+            return bool(value)
+        if kind == "Integer":
+            return bool(int(value))
+        if kind == "String":
+            return str(value).strip().lower() not in ("0", "false", "no", "off", "")
+    return bool(group.GetBool("Enabled", True))
 
 
 def set_enabled(value: bool) -> None:

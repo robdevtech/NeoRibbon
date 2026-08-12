@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>420</width>
-    <height>260</height>
+    <height>290</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -161,10 +161,23 @@
    <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
-      <string>Each section shows your most-used commands; the rest are under More. Hide or reorder sections from Sections. Button size changes icon and ribbon height. Ctrl+Shift+R restores classic toolbars if needed.</string>
+      <string>Each section shows your most-used commands; the rest are under More. Hide or reorder sections from Sections. Button size changes icon and ribbon height. Ctrl+Shift+R restores classic toolbars if needed. Apply or OK updates the ribbon immediately.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelVersion">
+     <property name="text">
+      <string>NeoRibbon 0.2.5</string>
+     </property>
+     <property name="toolTip">
+      <string>Installed addon version from package.xml</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: palette(mid);</string>
      </property>
     </widget>
    </item>

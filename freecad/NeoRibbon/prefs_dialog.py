@@ -17,7 +17,7 @@ from PySide.QtWidgets import (
     QVBoxLayout,
 )
 
-from neoribbon import prefs
+from freecad.NeoRibbon import prefs
 
 
 def _version_label_text() -> str:
@@ -63,7 +63,7 @@ class PreferencePage:
             prefs.set_button_size(prefs.BUTTON_SIZES[idx])
         prefs.set_visible_per_section(form.spinVisiblePerSection.value())
         prefs.set_ignored_toolbars_text(form.lineIgnoredToolbars.text())
-        from neoribbon import bootstrap
+        from freecad.NeoRibbon import bootstrap
 
         bootstrap.apply_prefs()
 
@@ -158,6 +158,6 @@ def open_preferences_dialog() -> None:
     dialog = PreferencesDialog(getMainWindow())
     if dialog.exec() == QDialog.DialogCode.Accepted:
         dialog.apply()
-        from neoribbon import bootstrap
+        from freecad.NeoRibbon import bootstrap
 
         bootstrap.apply_prefs()

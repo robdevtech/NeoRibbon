@@ -41,7 +41,7 @@ def wait_ms(ms: int) -> None:
 def snapshot(tag: str) -> dict:
     from PySide.QtWidgets import QDockWidget, QToolBar
 
-    from neoribbon import bootstrap, prefs
+    from freecad.NeoRibbon import bootstrap, prefs
 
     mw = Gui.getMainWindow()
     dock = mw.findChild(QDockWidget, "NeoRibbonDock")
@@ -82,7 +82,7 @@ def run() -> None:
     def work() -> None:
         stop = None
         try:
-            from neoribbon import bootstrap, prefs
+            from freecad.NeoRibbon import bootstrap, prefs
 
             log("--- Addon Manager signals ---")
             try:

@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import FreeCAD as App
 
-from neoribbon import prefs
-from neoribbon.prefs import PARAM_PATH
+from freecad.NeoRibbon import prefs
+from freecad.NeoRibbon.prefs import PARAM_PATH
 
 _USAGE_PATH = f"{PARAM_PATH}/Usage"
 

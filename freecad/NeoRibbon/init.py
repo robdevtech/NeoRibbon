@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """FreeCAD entry point (console + GUI).
 
-InitGui.py is the normal GUI installer. FreeCAD execs this file without
-__file__, so keep it tiny. If the GUI is already up (rare), schedule install.
+init_gui.py is the normal GUI installer. FreeCAD imports this module after
+__init__.py. If the GUI is already up (rare), schedule install.
 
 Addon Manager does not load a newly installed or re-enabled Mod until the next
 FreeCAD restart — there is no AM reload hook we can use.
@@ -26,7 +26,7 @@ def _schedule_gui_install() -> None:
         try:
             if Gui.getMainWindow() is None:
                 return
-            from neoribbon.bootstrap import addon_disabled_by_manager, install
+            from freecad.NeoRibbon.bootstrap import addon_disabled_by_manager, install
 
             if addon_disabled_by_manager():
                 return

@@ -98,11 +98,12 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 
 ## Design notes
 
-- Content type in `package.xml` is declared as **`workbench`** so FreeCAD runs `InitGui.py` at startup (NeoRibbon is still an InitGui-only Mod, not a Workbench class).
+- Content type in `package.xml` is **`other`** (InitGui-only Mod, not a Workbench class). FreeCAD runs namespaced `freecad/NeoRibbon/init_gui.py` for every content type, including `other`.
+- Layout follows the Addon Academy **modern namespaced** structure: Python lives under `freecad/NeoRibbon/` (`init_gui.py`, `init.py`, modules); `package.xml`, `LICENSE`, `README.md`, and `Resources/` stay at the Mod root.
 - Only the **active** workbench is inspected (`getToolbarItems`). Other workbenches are never activated for caching.
 - Ribbon widgets are plain Qt (`QDockWidget`, `QToolButton`, etc.).
 - Classic toolbars are restored immediately on toggle-off, Preferences **Enable ribbon** off (**Apply**/**OK**), `uninstall()`, and when Addon Manager writes `ADDON_DISABLED` (file watch — AM has no enable/disable signal in FreeCAD 1.1). The preference observer keeps a long-lived `ParamGet` handle (a temporary wrapper’s destructor detaches observers). Pending hide-timers are cancelled so disable cannot leave an empty toolbar strip. On quit, toolbars are shown again so the next session is not saved with zero chrome if the addon does not load.
-- **InitGui.py** installs the dock at GUI startup. **Init.py** only retries install if the main window is already up. First Addon Manager install / AM Enable still need a FreeCAD restart.
+- **`init_gui.py`** installs the dock at GUI startup. **`init.py`** only retries install if the main window is already up. First Addon Manager install / AM Enable still need a FreeCAD restart.
 
 ## Manual test checklist (FreeCAD 1.1+)
 

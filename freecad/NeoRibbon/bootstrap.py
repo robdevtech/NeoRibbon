@@ -12,10 +12,10 @@ from PySide.QtCore import QFileSystemWatcher, QTimer, Qt
 from PySide.QtGui import QKeySequence, QShortcut
 from PySide.QtWidgets import QMainWindow, QToolBar
 
-from neoribbon import prefs
-from neoribbon.commands import register as register_commands
-from neoribbon.ribbon_bar import RibbonDock
-from neoribbon.toolbar_ctrl import ToolbarController
+from freecad.NeoRibbon import prefs
+from freecad.NeoRibbon.commands import register as register_commands
+from freecad.NeoRibbon.ribbon_bar import RibbonDock
+from freecad.NeoRibbon.toolbar_ctrl import ToolbarController
 
 _controller: Optional[ToolbarController] = None
 _dock: Optional[RibbonDock] = None
@@ -70,7 +70,7 @@ def _main_window() -> QMainWindow:
 
 
 def _addon_dir() -> str:
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return prefs.addon_root()
 
 
 def _am_stopfile() -> str:
@@ -235,7 +235,7 @@ def _register_escape_shortcuts() -> None:
         (
             "Ctrl+Shift+,",
             lambda: __import__(
-                "neoribbon.prefs_dialog", fromlist=["open_preferences_dialog"]
+                "freecad.NeoRibbon.prefs_dialog", fromlist=["open_preferences_dialog"]
             ).open_preferences_dialog(),
             "NeoRibbon preferences",
         ),
@@ -254,10 +254,7 @@ def _register_escape_shortcuts() -> None:
 
 
 def _resources_dir() -> str:
-    return os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "Resources",
-    )
+    return os.path.join(prefs.addon_root(), "Resources")
 
 
 def _register_preference_page() -> None:
@@ -279,7 +276,7 @@ def _register_preference_page() -> None:
         )
 
     try:
-        from neoribbon.prefs_dialog import PreferencePage
+        from freecad.NeoRibbon.prefs_dialog import PreferencePage
 
         Gui.addPreferencePage(PreferencePage, "NeoRibbon")
     except Exception as exc:  # noqa: BLE001
@@ -296,7 +293,7 @@ def _register_preference_page() -> None:
 
 
 def install() -> None:
-    """Called once from InitGui.py."""
+    """Called once from freecad.NeoRibbon.init_gui."""
     global _installed, _controller, _pref_observer
     if _installed:
         return

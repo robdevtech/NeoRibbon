@@ -46,7 +46,7 @@ def pass_fail(name: str, ok: bool, detail: str = "") -> None:
 def snapshot(tag: str) -> dict:
     from PySide.QtWidgets import QDockWidget, QToolBar
 
-    from neoribbon import bootstrap, prefs
+    from freecad.NeoRibbon import bootstrap, prefs
 
     mw = Gui.getMainWindow()
     dock = mw.findChild(QDockWidget, "NeoRibbonDock")
@@ -81,15 +81,17 @@ def run() -> None:
 
     def work() -> None:
         try:
-            from neoribbon import bootstrap, prefs
-            from neoribbon.prefs_dialog import PreferencePage, _version_label_text
+            from freecad.NeoRibbon import bootstrap, prefs
+            from freecad.NeoRibbon.prefs_dialog import PreferencePage, _version_label_text
 
             log(f"addon_version={prefs.addon_version()!r}")
-            log(f"neoribbon.__version__={__import__('neoribbon').__version__!r}")
+            import freecad.NeoRibbon as nr
+
+            log(f"freecad.NeoRibbon.__version__={nr.__version__!r}")
             log(f"version_label={_version_label_text()!r}")
             pass_fail(
                 "package.xml version",
-                prefs.addon_version() == "0.2.6",
+                prefs.addon_version() == "0.2.7",
                 prefs.addon_version(),
             )
 

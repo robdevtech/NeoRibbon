@@ -5,7 +5,7 @@
 
   <description>Lightweight ribbon UI for FreeCAD 1.1+. Maps the active workbench toolbars into a compact top ribbon, hides classic toolbars while enabled, and restores them on disable. No external Python dependencies.</description>
 
-  <version>0.2.6</version>
+  <version>0.2.7</version>
 
   <date>2026-08-11</date>
 
@@ -24,18 +24,13 @@
   <url type="bugtracker">https://github.com/robdevtech/NeoRibbon/issues</url>
 
   <content>
-    <!--
-      InitGui-only Mod (not a Workbench class). FreeCAD still needs a
-      workbench content item so InitGui.py is executed at GUI startup —
-      same pattern as other InitGui-only Mods (e.g. ToolSeek).
-    -->
-    <workbench>
+    <other>
       <freecadmin>1.1.0</freecadmin>
       <icon>Resources/icons/NeoRibbon.svg</icon>
       <subdirectory>./</subdirectory>
       <tag>ribbon</tag>
       <tag>ui</tag>
-    </workbench>
+    </other>
   </content>
 
 </package>

@@ -9,7 +9,7 @@ from typing import Optional
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from neoribbon import prefs
+from freecad.NeoRibbon import prefs
 
 # FreeCAD ships bad metadata for some compound commands (wrong menuText / empty pixmap).
 _COMMAND_LABEL_FIXES = {

@@ -31,8 +31,8 @@ from PySide.QtWidgets import (
     QWidget,
 )
 
-from neoribbon import prefs, theme, usage
-from neoribbon.workbench_map import (
+from freecad.NeoRibbon import prefs, theme, usage
+from freecad.NeoRibbon.workbench_map import (
     RibbonCommand,
     RibbonPanel,
     active_panels,
@@ -115,11 +115,7 @@ def density_style(name: str | None = None) -> DensityStyle:
     return DENSITY_STYLES.get(key, DENSITY_STYLES["medium"])
 
 
-_ICON_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "Resources",
-    "icons",
-)
+_ICON_DIR = os.path.join(prefs.addon_root(), "Resources", "icons")
 
 
 def _file_icon(name: str) -> QIcon:

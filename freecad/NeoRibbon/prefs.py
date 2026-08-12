@@ -21,12 +21,13 @@ _group_handle = None
 
 
 def addon_root() -> str:
-    """Addon directory (package.xml / InitGui.py live here)."""
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    """Addon Mod root (package.xml / Resources live here; freecad/NeoRibbon/ is nested)."""
+    # freecad/NeoRibbon/prefs.py → parents[2] = Mod / repo root
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def addon_version() -> str:
-    """Version from package.xml next to InitGui — cannot drift from the package."""
+    """Version from package.xml at Mod root — cannot drift from the package."""
     path = os.path.join(addon_root(), "package.xml")
     try:
         root = ET.parse(path).getroot()

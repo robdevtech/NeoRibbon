@@ -15,7 +15,7 @@ def run():
         mw = Gui.getMainWindow()
         dock = mw.findChild(QDockWidget, "NeoRibbonDock")
         App.Console.PrintMessage(f"NeoRibbon smoke: dock={dock is not None}\n")
-        from neoribbon import bootstrap
+        from freecad.NeoRibbon import bootstrap
 
         App.Console.PrintMessage(
             f"NeoRibbon smoke: installed={bootstrap._installed}\n"

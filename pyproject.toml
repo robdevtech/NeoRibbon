@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+[project]
+name = "NeoRibbon"
+version = "0.2.8"
+description = "Lightweight ribbon UI for FreeCAD 1.1+"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "freecad-stubs>=1.0.21",
+    "pyside6>=6.11.0",
+]

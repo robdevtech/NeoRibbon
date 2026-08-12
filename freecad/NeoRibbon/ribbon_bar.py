@@ -115,7 +115,7 @@ def density_style(name: str | None = None) -> DensityStyle:
     return DENSITY_STYLES.get(key, DENSITY_STYLES["medium"])
 
 
-_ICON_DIR = os.path.join(prefs.addon_root(), "Resources", "icons")
+_ICON_DIR = os.path.join(prefs.addon_root(), "Resources", "Icons")
 
 
 def _file_icon(name: str) -> QIcon:

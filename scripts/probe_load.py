@@ -60,7 +60,7 @@ def run() -> None:
             if dock is not None and hasattr(dock, "ribbon"):
                 log(f"panels={dock.ribbon.panel_count}")
 
-            if prefs.addon_version() != "0.2.7":
+            if prefs.addon_version() != "0.2.8":
                 ok = False
                 log("FAIL: unexpected package.xml version")
             if not bootstrap._installed:

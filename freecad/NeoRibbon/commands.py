@@ -10,7 +10,7 @@ import FreeCADGui as Gui
 
 from freecad.NeoRibbon import prefs
 
-_ICON_DIR = os.path.join(prefs.addon_root(), "Resources", "icons")
+_ICON_DIR = os.path.join(prefs.addon_root(), "Resources", "Icons")
 
 
 def _icon_path(name: str) -> str:

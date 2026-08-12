@@ -91,7 +91,7 @@ def run() -> None:
             log(f"version_label={_version_label_text()!r}")
             pass_fail(
                 "package.xml version",
-                prefs.addon_version() == "0.2.7",
+                prefs.addon_version() == "0.2.8",
                 prefs.addon_version(),
             )
 

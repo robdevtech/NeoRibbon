@@ -2,9 +2,9 @@
 
 Lightweight Office/Fusion-style ribbon for **FreeCAD 1.1+**. The active workbench’s toolbars become compact side-by-side groups (small bottom titles, 3-row button grid)—not one oversized tab per toolbar. Classic toolbars are hidden while enabled and restored on disable. **No pip packages and no vendored ribbon toolkit.**
 
-![NeoRibbon with OpenLight theme](images/NeoRibbon_OpenLight.png)
+![NeoRibbon with OpenLight theme](Resources/Media/NeoRibbon_OpenLight.png)
 
-![NeoRibbon with OpenDark theme](images/NeoRibbon_OpenDark.png)
+![NeoRibbon with OpenDark theme](Resources/Media/NeoRibbon_OpenDark.png)
 
 ## Requirements
 
@@ -96,10 +96,27 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 
 **Workbench:** NeoRibbon hides the classic toolbar that held FreeCAD’s workbench combo. Use the **Workbench** control at the **left** of the ribbon instead.
 
-## Design notes
+## Layout (Addon Academy modern)
 
-- Content type in `package.xml` is **`other`** (InitGui-only Mod, not a Workbench class). FreeCAD runs namespaced `freecad/NeoRibbon/init_gui.py` for every content type, including `other`.
-- Layout follows the Addon Academy **modern namespaced** structure: Python lives under `freecad/NeoRibbon/` (`init_gui.py`, `init.py`, modules); `package.xml`, `LICENSE`, `README.md`, and `Resources/` stay at the Mod root.
+Follows the [Structuring](https://freecad.github.io/Addon-Academy/Topics/Structuring/) modern namespaced layout:
+
+```
+NeoRibbon/
+├─ freecad/NeoRibbon/     # Python package (__init__.py, init.py, init_gui.py, …)
+├─ Resources/
+│  ├─ Icons/              # SVG icons (package.xml + commands)
+│  ├─ Media/              # README screenshots
+│  └─ ui/                 # Preferences .ui
+├─ LICENSE-Code           # LGPL-2.1-or-later (Python)
+├─ LICENSE-Assets         # LGPL-2.1-or-later (icons / media)
+├─ package.xml
+├─ pyproject.toml         # optional dev deps (freecad-stubs, pyside6)
+├─ README.md
+└─ scripts/               # local FreeCAD probes (not loaded by FreeCAD)
+```
+
+- Content type in `package.xml` is **`other`** (not a Workbench class). FreeCAD still runs namespaced `freecad/NeoRibbon/init_gui.py` (and `init.py`) for `other`.
+- No top-level `Init.py` / `InitGui.py`; no Python package code at the Mod root.
 - Only the **active** workbench is inspected (`getToolbarItems`). Other workbenches are never activated for caching.
 - Ribbon widgets are plain Qt (`QDockWidget`, `QToolButton`, etc.).
 - Classic toolbars are restored immediately on toggle-off, Preferences **Enable ribbon** off (**Apply**/**OK**), `uninstall()`, and when Addon Manager writes `ADDON_DISABLED` (file watch — AM has no enable/disable signal in FreeCAD 1.1). The preference observer keeps a long-lived `ParamGet` handle (a temporary wrapper’s destructor detaches observers). Pending hide-timers are cancelled so disable cannot leave an empty toolbar strip. On quit, toolbars are shown again so the next session is not saved with zero chrome if the addon does not load.
@@ -128,4 +145,4 @@ flatpak run org.freecad.FreeCAD /path/to/NeoRibbon/scripts/smoke_gui.py
 ## Support
 
 - Issues: https://github.com/robdevtech/NeoRibbon/issues
-- License: LGPL-2.1-or-later — see [LICENSE](LICENSE)
+- License: LGPL-2.1-or-later — see [LICENSE-Code](LICENSE-Code) and [LICENSE-Assets](LICENSE-Assets)

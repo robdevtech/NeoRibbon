@@ -1,33 +1,35 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
 
+  <!-- For information about the contents of this file see
+  https://freecad.github.io/Addon-Academy/Topics/Structuring/Manifest/ -->
+
   <name>NeoRibbon</name>
 
   <description>Lightweight ribbon UI for FreeCAD 1.1+. Maps the active workbench toolbars into a compact top ribbon, hides classic toolbars while enabled, and restores them on disable. No external Python dependencies.</description>
 
-  <version>0.2.7</version>
+  <version>0.2.8</version>
 
   <date>2026-08-11</date>
 
   <maintainer email="therobdev@pm.me">Rob</maintainer>
 
-  <license file="LICENSE">LGPL-2.1-or-later</license>
+  <license file="LICENSE-Code">LGPL-2.1-or-later</license>
+  <license file="LICENSE-Assets">LGPL-2.1-or-later</license>
 
+  <freecadmin>1.1.0</freecadmin>
   <pythonmin>3.10.0</pythonmin>
 
-  <icon>Resources/icons/NeoRibbon.svg</icon>
+  <icon>Resources/Icons/NeoRibbon.svg</icon>
 
   <url type="repository" branch="master">https://github.com/robdevtech/NeoRibbon</url>
-
-  <url type="readme">https://github.com/robdevtech/NeoRibbon/blob/master/README.md</url>
-
+  <url type="readme">https://raw.githubusercontent.com/robdevtech/NeoRibbon/master/README.md</url>
   <url type="bugtracker">https://github.com/robdevtech/NeoRibbon/issues</url>
 
   <content>
     <other>
-      <freecadmin>1.1.0</freecadmin>
-      <icon>Resources/icons/NeoRibbon.svg</icon>
       <subdirectory>./</subdirectory>
+      <icon>Resources/Icons/NeoRibbon.svg</icon>
       <tag>ribbon</tag>
       <tag>ui</tag>
     </other>

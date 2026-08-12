@@ -20,11 +20,12 @@ While NeoRibbon is **enabled**, it intentionally changes FreeCAD’s main-window
 
 This is reversible at any time:
 
-| Goal | Action |
-|------|--------|
-| Turn NeoRibbon off | **Tools → Toggle NeoRibbon** or **Ctrl+Shift+N** |
-| Force classic toolbars back | **Tools → Restore classic toolbars** or **Ctrl+Shift+R** |
-| Preferences | **Edit → Preferences → NeoRibbon**, **Tools → NeoRibbon preferences…**, or **Ctrl+Shift+,** |
+| Goal | Action | Restart? |
+|------|--------|----------|
+| Turn NeoRibbon off (keep addon loaded) | **Tools → Toggle NeoRibbon** / **Ctrl+Shift+N**, or uncheck **Enabled** in Preferences | **No** — classic toolbars and the menu bar come back immediately |
+| Force classic toolbars back | **Tools → Restore classic toolbars** or **Ctrl+Shift+R** | No |
+| Preferences (size, labels, …) | **Edit → Preferences → NeoRibbon**, **Tools → NeoRibbon preferences…**, or **Ctrl+Shift+,** | No — Apply/OK takes effect immediately |
+| Disable or uninstall via **Addon Manager** | AM writes `ADDON_DISABLED` (or deletes the Mod). NeoRibbon restores classic toolbars in the current session | **Yes** — FreeCAD only unloads/loads Mods at startup. First install and AM Enable also need a restart |
 
 NeoRibbon does not phone home or send telemetry. Preferences and usage counts stay in FreeCAD’s local parameter store (`User parameter:BaseApp/Preferences/Mod/NeoRibbon`).
 
@@ -34,7 +35,7 @@ NeoRibbon does not phone home or send telemetry. Preferences and usage counts st
 
 1. **Tools → Addon manager**
 2. Install from repository: `https://github.com/robdevtech/NeoRibbon`
-3. Restart FreeCAD when prompted
+3. Restart FreeCAD when prompted — **required**. Addon Manager does not load a new Mod (or re-enable one) until the next startup. NeoRibbon cannot show the dock in that same session.
 
 After this addon is accepted into the official Addon Index, it will also appear in the Addon Manager browse list.
 
@@ -99,7 +100,8 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 - Content type in `package.xml` is declared as **`workbench`** so FreeCAD runs `InitGui.py` at startup (NeoRibbon is still an InitGui-only Mod, not a Workbench class).
 - Only the **active** workbench is inspected (`getToolbarItems`). Other workbenches are never activated for caching.
 - Ribbon widgets are plain Qt (`QDockWidget`, `QToolButton`, etc.).
-- Classic toolbars are tracked and restored on toggle-off / uninstall path / recovery command.
+- Classic toolbars are restored immediately on toggle-off, Preferences **Enabled** off, `uninstall()`, and when Addon Manager writes `ADDON_DISABLED` (file watch — AM has no enable/disable signal in FreeCAD 1.1). Pending hide-timers are cancelled so disable cannot leave an empty toolbar strip. On quit, toolbars are shown again so the next session is not saved with zero chrome if the addon does not load.
+- **InitGui.py** installs the dock at GUI startup. **Init.py** only retries install if the main window is already up. First Addon Manager install / AM Enable still need a FreeCAD restart.
 
 ## Manual test checklist (FreeCAD 1.1+)
 

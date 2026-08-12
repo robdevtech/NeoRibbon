@@ -8,7 +8,7 @@ from typing import Optional
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide.QtCore import QTimer, Qt
+from PySide.QtCore import QFileSystemWatcher, QTimer, Qt
 from PySide.QtGui import QKeySequence, QShortcut
 from PySide.QtWidgets import QMainWindow, QToolBar
 
@@ -24,6 +24,8 @@ _refresh_pending = False
 _pref_observer = None
 _pref_apply_pending = False
 _escape_shortcuts: list = []
+_fs_watcher: Optional[QFileSystemWatcher] = None
+_AM_STOPFILE = "ADDON_DISABLED"
 
 # Keys written by Edit → Preferences → NeoRibbon (and Tools dialog).
 _PREF_PAGE_KEYS = frozenset(
@@ -65,10 +67,50 @@ def _main_window() -> QMainWindow:
     return Gui.getMainWindow()
 
 
+def _addon_dir() -> str:
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _am_stopfile() -> str:
+    return os.path.join(_addon_dir(), _AM_STOPFILE)
+
+
+def addon_disabled_by_manager() -> bool:
+    """True when Addon Manager wrote ADDON_DISABLED (takes effect next restart)."""
+    return os.path.isfile(_am_stopfile())
+
+
+def _on_addon_dir_changed(_path: str = "") -> None:
+    """AM disable/uninstall is a stopfile or deleted Mod dir — no Qt signal."""
+    if not _installed:
+        return
+    gone = not os.path.isdir(_addon_dir())
+    if gone or addon_disabled_by_manager():
+        App.Console.PrintMessage(
+            "NeoRibbon: Addon Manager disabled or removed this addon; "
+            "restoring classic UI now (restart still required to unload)\n"
+        )
+        uninstall()
+
+
+def _ensure_am_watcher() -> None:
+    global _fs_watcher
+    if _fs_watcher is not None:
+        return
+    root = _addon_dir()
+    if not os.path.isdir(root):
+        return
+    watcher = QFileSystemWatcher()
+    if not watcher.addPath(root):
+        return
+    watcher.directoryChanged.connect(_on_addon_dir_changed)
+    _fs_watcher = watcher
+
+
 def _on_workbench_activated(_name: str = "") -> None:
     """Refresh ribbon after FreeCAD finishes activating a workbench."""
     global _refresh_pending
-    if not prefs.is_enabled() or _dock is None:
+    if not prefs.is_enabled() or addon_disabled_by_manager() or _dock is None:
         return
     if _refresh_pending:
         return
@@ -77,12 +119,14 @@ def _on_workbench_activated(_name: str = "") -> None:
     def _do_refresh() -> None:
         global _refresh_pending
         _refresh_pending = False
+        if not prefs.is_enabled() or addon_disabled_by_manager() or _dock is None:
+            return
         try:
             if _controller is not None:
                 _controller.enable_guard()
                 _controller.hide_classic_deferred()
                 _controller.show_menubar()
-            if _dock is not None:
+            if _dock is not None and _dock.isVisible():
                 _dock.refresh()
         except Exception as exc:  # noqa: BLE001
             App.Console.PrintError(f"NeoRibbon: refresh failed: {exc}\n")
@@ -107,6 +151,9 @@ def _ensure_dock() -> RibbonDock:
 
 def _show_ribbon() -> None:
     global _controller
+    if addon_disabled_by_manager():
+        _hide_ribbon(restore_toolbars=True)
+        return
     dock = _ensure_dock()
     dock.show()
     if _controller is None:
@@ -121,13 +168,23 @@ def _hide_ribbon(restore_toolbars: bool = True) -> None:
     global _dock, _controller
     if _dock is not None:
         _dock.hide()
-    if restore_toolbars and _controller is not None:
-        _controller.restore()
+        try:
+            _dock.setVisible(False)
+        except Exception:
+            pass
+    if restore_toolbars:
+        if _controller is None:
+            _controller = ToolbarController()
+        # restore_all: do not rely on the hide-tracking set (timers / late bars).
+        _controller.restore_all_toolbars()
 
 
 def apply_prefs() -> None:
     """Re-apply preference values to the live UI (no FreeCAD restart needed)."""
     if not _installed:
+        return
+    if addon_disabled_by_manager():
+        _hide_ribbon(restore_toolbars=True)
         return
     if prefs.is_enabled():
         _show_ribbon()
@@ -153,9 +210,7 @@ def restore_toolbars() -> None:
         _controller = ToolbarController()
     prefs.clear_legacy_hide_menubar()
     prefs.set_enabled(False)
-    _controller.restore_all_toolbars()
-    if _dock is not None:
-        _dock.hide()
+    _hide_ribbon(restore_toolbars=True)
     App.Console.PrintMessage(
         "NeoRibbon: restored classic UI (toolbars + menu bar); ribbon disabled\n"
     )
@@ -263,7 +318,12 @@ def install() -> None:
     for toolbar in mw.findChildren(QToolBar):
         toolbar.installEventFilter(_controller)
 
-    if prefs.is_enabled():
+    _ensure_am_watcher()
+
+    if addon_disabled_by_manager() or not prefs.is_enabled():
+        # Enabled-off or AM-disabled this session: never leave chrome empty.
+        _hide_ribbon(restore_toolbars=True)
+    else:
         # Defer first build until a real workbench is up.
         QTimer.singleShot(0, _show_ribbon)
 
@@ -273,8 +333,10 @@ def install() -> None:
 def uninstall() -> None:
     """Restore classic UI and disconnect signals."""
     global _installed, _dock, _controller, _refresh_pending, _pref_observer
-    global _escape_shortcuts
+    global _escape_shortcuts, _fs_watcher
     if not _installed:
+        # Still restore if a previous session hid toolbars.
+        _hide_ribbon(restore_toolbars=True)
         return
     mw = _main_window()
     try:
@@ -287,6 +349,16 @@ def uninstall() -> None:
         except Exception:
             pass
         _pref_observer = None
+    if _fs_watcher is not None:
+        try:
+            _fs_watcher.directoryChanged.disconnect(_on_addon_dir_changed)
+        except Exception:
+            pass
+        try:
+            _fs_watcher.deleteLater()
+        except Exception:
+            pass
+        _fs_watcher = None
     for shortcut in _escape_shortcuts:
         try:
             shortcut.setParent(None)
@@ -296,7 +368,10 @@ def uninstall() -> None:
     _escape_shortcuts = []
     _hide_ribbon(restore_toolbars=True)
     if _dock is not None:
-        mw.removeDockWidget(_dock)
+        try:
+            mw.removeDockWidget(_dock)
+        except Exception:
+            pass
         _dock.deleteLater()
         _dock = None
     _controller = None

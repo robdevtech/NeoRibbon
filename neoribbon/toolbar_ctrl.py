@@ -27,6 +27,7 @@ class ToolbarController(QObject):
         self._hidden_anon: set[int] = set()
         self._filtering = False
         self._mw: QMainWindow | None = None
+        self._hide_timers: list = []
 
     def _main_window(self) -> QMainWindow:
         return Gui.getMainWindow()
@@ -46,6 +47,7 @@ class ToolbarController(QObject):
 
     def disable_guard(self) -> None:
         self._enabled = False
+        self._cancel_hide_timers()
         if self._mw is not None:
             try:
                 self._mw.removeEventFilter(self)
@@ -83,7 +85,11 @@ class ToolbarController(QObject):
             toolbar.hide()
 
     def hide_classic(self) -> None:
+        if not self._enabled:
+            return
         mw = self._main_window()
+        if mw is None:
+            return
         for toolbar in mw.findChildren(QToolBar):
             try:
                 toolbar.installEventFilter(self)
@@ -91,20 +97,47 @@ class ToolbarController(QObject):
                 pass
             self._track_and_hide(toolbar)
 
+    def _cancel_hide_timers(self) -> None:
+        for timer in self._hide_timers:
+            try:
+                timer.stop()
+                timer.deleteLater()
+            except Exception:
+                pass
+        self._hide_timers = []
+
     def hide_classic_deferred(self) -> None:
         """Hide now and once more shortly after (late workbench toolbars)."""
         self.hide_classic()
         # Fixed dual-shot — not a poll loop. BIM/CAM often populate after t=0.
-        QTimer.singleShot(0, self.hide_classic)
-        QTimer.singleShot(150, self.hide_classic)
-        QTimer.singleShot(400, self.hide_classic)
+        # Must be cancellable: otherwise a later shot re-hides after disable.
+        self._cancel_hide_timers()
+        for delay in (0, 150, 400):
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self.hide_classic)
+            timer.start(delay)
+            self._hide_timers.append(timer)
 
     def eventFilter(self, watched, event) -> bool:  # noqa: N802
-        if not self._enabled or self._filtering:
-            return False
         try:
             etype = event.type()
         except Exception:
+            return False
+
+        # Restore before FreeCAD persists window state, so AM-disable + quit
+        # cannot leave the next session with zero toolbars. Do not touch the
+        # menu bar here — it is already being destroyed on close.
+        if etype == QEvent.Type.Close and self._mw is not None and watched is self._mw:
+            try:
+                self._enabled = False
+                self._cancel_hide_timers()
+                self._show_classic_toolbars()
+            except Exception:
+                pass
+            return False
+
+        if not self._enabled or self._filtering:
             return False
 
         if etype == QEvent.Type.ChildAdded:
@@ -143,7 +176,12 @@ class ToolbarController(QObject):
     def show_menubar(self) -> None:
         """Ensure the FreeCAD menu bar is visible (NeoRibbon never hides it)."""
         mw = self._main_window()
-        menubar = mw.menuBar()
+        if mw is None:
+            return
+        try:
+            menubar = mw.menuBar()
+        except Exception:
+            return
         if menubar is None:
             return
         menubar.show()
@@ -152,30 +190,33 @@ class ToolbarController(QObject):
         except Exception:
             pass
 
-    def restore(self) -> None:
-        self.disable_guard()
+    def _show_classic_toolbars(self) -> int:
         mw = self._main_window()
-        restored = 0
-        for toolbar in mw.findChildren(QToolBar):
-            name = toolbar.objectName() or ""
-            if name in self._hidden_names or id(toolbar) in self._hidden_anon:
-                toolbar.show()
-                restored += 1
-        self._hidden_names.clear()
-        self._hidden_anon.clear()
-        self.show_menubar()
-        App.Console.PrintLog(f"NeoRibbon: restored {restored} toolbars\n")
-
-    def restore_all_toolbars(self) -> None:
-        """Emergency recovery: show every non-NeoRibbon toolbar + menu bar."""
-        self.disable_guard()
-        mw = self._main_window()
+        if mw is None:
+            return 0
+        shown = 0
         for toolbar in mw.findChildren(QToolBar):
             name = toolbar.objectName() or ""
             if name.startswith("NeoRibbon"):
                 continue
-            toolbar.show()
+            try:
+                toolbar.show()
+                shown += 1
+            except Exception:
+                pass
         self._hidden_names.clear()
         self._hidden_anon.clear()
-        self.show_menubar()
-        App.Console.PrintMessage("NeoRibbon: all classic toolbars restored\n")
+        return shown
+
+    def restore(self) -> None:
+        """Show toolbars we hid, then fall back to every classic toolbar."""
+        self.disable_guard()
+        self.restore_all_toolbars()
+
+    def restore_all_toolbars(self, *, touch_menubar: bool = True) -> None:
+        """Show every non-NeoRibbon toolbar (+ menu bar unless shutting down)."""
+        self.disable_guard()
+        shown = self._show_classic_toolbars()
+        if touch_menubar:
+            self.show_menubar()
+        App.Console.PrintLog(f"NeoRibbon: restored {shown} classic toolbars\n")

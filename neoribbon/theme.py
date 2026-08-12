@@ -86,10 +86,21 @@ def _reference_palette() -> QPalette:
     dark on an otherwise light UI.
     """
     mw = Gui.getMainWindow()
-    menubar = mw.menuBar()
+    if mw is None:
+        return QPalette()
+    try:
+        menubar = mw.menuBar()
+    except Exception:
+        menubar = None
     if isinstance(menubar, QMenuBar):
-        return menubar.palette()
-    return mw.palette()
+        try:
+            return menubar.palette()
+        except Exception:
+            pass
+    try:
+        return mw.palette()
+    except Exception:
+        return QPalette()
 
 
 def resolve_colors() -> ThemeColors:

@@ -128,6 +128,12 @@ def _file_icon(name: str) -> QIcon:
 
 
 def _icon_for(command: RibbonCommand, action_index: int = 0) -> QIcon:
+    # Prefer the live QAction icon. Sketcher construction mode (and similar)
+    # swaps action.icon() while Gui.getIcon(pixmap) stays on the static normal
+    # artwork — same source classic toolbars use via QToolButton.defaultAction().
+    action_icon = command_action_icon(command.name, action_index)
+    if action_icon is not None:
+        return action_icon
     if command.pixmap:
         try:
             icon = Gui.getIcon(command.pixmap)
@@ -137,10 +143,6 @@ def _icon_for(command: RibbonCommand, action_index: int = 0) -> QIcon:
             App.Console.PrintWarning(
                 f"NeoRibbon: getIcon({command.pixmap!r}) failed: {exc}\n"
             )
-    # Compound commands often have an empty pixmap; use the action icon.
-    action_icon = command_action_icon(command.name, action_index)
-    if action_icon is not None:
-        return action_icon
     return QIcon()
 
 
@@ -293,8 +295,20 @@ def _open_command_help(command_name: str) -> None:
         App.Console.PrintError(f"NeoRibbon: could not open help for {page!r}: {exc}\n")
 
 
+def _sync_action_icon(button: QToolButton, action) -> None:
+    """Copy the live QAction icon onto a ribbon button (construction-mode swaps)."""
+    try:
+        icon = action.icon()
+        if icon is not None and not icon.isNull():
+            button.setIcon(icon)
+    except RuntimeError:
+        return
+    except Exception:
+        return
+
+
 def _sync_toggle_button(button: QToolButton, action) -> None:
-    """Copy checkable/checked/enabled from a live QAction onto a ribbon button."""
+    """Copy checkable/checked/enabled/icon from a live QAction onto a ribbon button."""
     try:
         checkable = bool(action.isCheckable())
         button.setCheckable(checkable)
@@ -307,10 +321,11 @@ def _sync_toggle_button(button: QToolButton, action) -> None:
         return
     except Exception:
         return
+    _sync_action_icon(button, action)
 
 
 class _ActionStateWatch(QObject):
-    """Keep a QToolButton's checked/enabled state aligned with a QAction."""
+    """Keep a QToolButton's checked/enabled/icon aligned with a QAction."""
 
     def __init__(self, button: QToolButton, action) -> None:
         super().__init__(button)
@@ -325,6 +340,12 @@ class _ActionStateWatch(QObject):
             action.changed.connect(self._on_action_changed)
         except Exception:
             pass
+        # Qt 6 QAction.iconChanged; FreeCAD 1.1 command actions often omit it.
+        if hasattr(action, "iconChanged"):
+            try:
+                action.iconChanged.connect(self._on_action_changed)
+            except Exception:
+                pass
 
     def _on_action_toggled(self, checked: bool) -> None:
         try:
@@ -430,6 +451,9 @@ def _wire_command_button(
     if toggle is not None:
         _bind_toggle_button(button, command, toggle, 0)
         return
+    # Non-checkable commands (e.g. Sketcher geometry) still swap icons live.
+    if qactions:
+        _ActionStateWatch(button, qactions[0])
     button.clicked.connect(
         lambda _c=False, n=command.name: _run_command(n, 0)
     )
@@ -840,9 +864,9 @@ class SectionListPopup(QFrame):
         run_btn.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        toggle = command_checkable_action(command.name, 0)
-        if toggle is not None:
-            _ActionStateWatch(run_btn, toggle)
+        qactions = command_qactions(command.name)
+        if qactions:
+            _ActionStateWatch(run_btn, qactions[0])
         run_btn.clicked.connect(lambda _c=False, n=command.name: self._activate(n))
         layout.addWidget(run_btn, 1)
 

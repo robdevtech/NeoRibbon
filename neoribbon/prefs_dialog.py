@@ -54,6 +54,7 @@ class PreferencesDialog(QDialog):
         hint = QLabel(
             "Each section shows your most-used commands; extras are under More. "
             "Hide sections with × on the section title, or Sections ▾. "
+            "Reorder groups from Sections ▾ → Reorder sections…. "
             "Ctrl+Shift+R restores classic toolbars if needed."
         )
         hint.setWordWrap(True)

@@ -122,29 +122,50 @@ def command_action_icon(command_name: str, index: int = 0):
 
 def command_actions_meta(command_name: str) -> list[tuple[int, str, str]]:
     """Return [(index, text, tooltip), ...] for compound FreeCAD commands."""
-    try:
-        command = Gui.Command.get(command_name)
-    except Exception:
-        return []
-    if command is None:
-        return []
     result = []
-    for index, action in enumerate(_command_actions(command)):
+    for index, action in enumerate(command_qactions(command_name)):
         text = (action.text() or "").replace("&", "").strip() or f"Action {index}"
         tip = (action.toolTip() or text).strip()
         result.append((index, text, tip))
     return result
 
 
+def command_qactions(command_name: str) -> list:
+    """Live QAction list for a FreeCAD command, or [] if none exist yet."""
+    if not command_name:
+        return []
+    try:
+        command = Gui.Command.get(command_name)
+        if command is None:
+            return []
+        return _command_actions(command)
+    except Exception:
+        return []
+
+
+def command_checkable_action(command_name: str, index: int = 0):
+    """Return the QAction at *index* when it exists and is checkable."""
+    actions = command_qactions(command_name)
+    if not (0 <= index < len(actions)):
+        return None
+    action = actions[index]
+    try:
+        if action is not None and action.isCheckable():
+            return action
+    except Exception:
+        return None
+    return None
+
+
 def _is_separator(token: str) -> bool:
     return not token or token in {"|", "Separator", "separator"}
 
 
-def active_panels() -> list[RibbonPanel]:
+def workbench_toolbar_panels() -> list[RibbonPanel]:
     """
-    Build panels for the currently active workbench only.
+    Panels in the active workbench's getToolbarItems() order.
 
-    Never activates other workbenches.
+    Never activates other workbenches. Does not apply custom section order.
     """
     ignored = prefs.ignored_toolbars()
     try:
@@ -194,6 +215,23 @@ def active_panels() -> list[RibbonPanel]:
                 RibbonPanel(name=str(toolbar_name), commands=tuple(ribbon_commands))
             )
     return panels
+
+
+def active_panels() -> list[RibbonPanel]:
+    """
+    Panels for the active workbench, with persisted custom section order applied.
+
+    New/unknown toolbars append after saved names. Hidden sections are not
+    filtered here — callers omit them when building the visible ribbon.
+    """
+    panels = workbench_toolbar_panels()
+    if not panels:
+        return panels
+    ordered = prefs.apply_section_order(
+        active_workbench_name(), [panel.name for panel in panels]
+    )
+    by_name = {panel.name: panel for panel in panels}
+    return [by_name[name] for name in ordered if name in by_name]
 
 
 def active_workbench_name() -> Optional[str]:

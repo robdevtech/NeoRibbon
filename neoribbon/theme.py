@@ -246,6 +246,19 @@ def build_stylesheet(colors: ThemeColors | None = None) -> str:
             color: {colors.hover_text};
             border-radius: 3px;
         }}
+        QToolButton[objectName^="NeoRibbon_btn_"]:checked,
+        QToolButton[objectName^="NeoRibbon_list_btn_"]:checked {{
+            background: {colors.hover};
+            color: {colors.hover_text};
+            border: 1px solid {colors.accent};
+            border-radius: 3px;
+        }}
+        QToolButton[objectName^="NeoRibbon_btn_"]:checked:hover,
+        QToolButton[objectName^="NeoRibbon_list_btn_"]:checked:hover {{
+            background: {colors.hover};
+            color: {colors.hover_text};
+            border: 1px solid {colors.accent};
+        }}
         QWidget#NeoRibbon_group_sep {{
             background: {colors.border};
             max-width: 1px;

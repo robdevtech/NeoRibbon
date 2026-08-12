@@ -161,7 +161,7 @@
    <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
-      <string>Each section shows your most-used commands; the rest are under More. Hide sections with × or Sections. Button size changes icon and ribbon height. Ctrl+Shift+R restores classic toolbars if needed.</string>
+      <string>Each section shows your most-used commands; the rest are under More. Hide or reorder sections from Sections. Button size changes icon and ribbon height. Ctrl+Shift+R restores classic toolbars if needed.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>

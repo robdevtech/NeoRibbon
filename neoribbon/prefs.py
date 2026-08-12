@@ -199,6 +199,73 @@ def toggle_section_hidden(name: str) -> bool:
     return hidden
 
 
+def _section_order_group():
+    return App.ParamGet(f"{PARAM_PATH}/SectionOrder")
+
+
+def _section_order_key(workbench: str) -> str:
+    return (workbench or "workbench").replace("/", "_").replace("\\", "_")[:200]
+
+
+def section_order(workbench: str | None) -> list[str]:
+    """Saved ribbon section names for a workbench, or empty (use workbench order)."""
+    if not workbench:
+        return []
+    raw = _section_order_group().GetString(_section_order_key(workbench), "")
+    return [part.strip() for part in raw.split(";") if part.strip()]
+
+
+def set_section_order(workbench: str | None, names: Iterable[str]) -> None:
+    if not workbench:
+        return
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in names:
+        name = (name or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+    _section_order_group().SetString(_section_order_key(workbench), ";".join(ordered))
+
+
+def clear_section_order(workbench: str | None) -> None:
+    """Drop custom order so the workbench toolbar order is used again."""
+    if not workbench:
+        return
+    group = _section_order_group()
+    key = _section_order_key(workbench)
+    try:
+        group.RemString(key)
+    except Exception:
+        group.SetString(key, "")
+
+
+def apply_section_order(workbench: str | None, names: Iterable[str]) -> list[str]:
+    """
+    Reorder *names* using a saved per-workbench list.
+
+    Unknown/new names keep their relative order and append after saved ones.
+    An empty saved list means “use the given (workbench) order”.
+    """
+    current = [name for name in names if name]
+    saved = section_order(workbench)
+    if not saved:
+        return current
+    known = set(current)
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in saved:
+        if name in known and name not in seen:
+            ordered.append(name)
+            seen.add(name)
+    for name in current:
+        if name not in seen:
+            ordered.append(name)
+            seen.add(name)
+    return ordered
+
+
 def _pins_group():
     return App.ParamGet(f"{PARAM_PATH}/Pins")
 

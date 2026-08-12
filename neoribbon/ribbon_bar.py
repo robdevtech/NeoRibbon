@@ -9,10 +9,12 @@ from typing import Callable, Optional
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide.QtCore import QEvent, QPoint, QSize, Qt, QTimer
-from PySide.QtGui import QFont, QIcon
+from PySide.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer
+from PySide.QtGui import QFont, QGuiApplication, QIcon
 from PySide.QtWidgets import (
     QAbstractItemView,
+    QDialog,
+    QDialogButtonBox,
     QDockWidget,
     QFrame,
     QGridLayout,
@@ -21,6 +23,7 @@ from PySide.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMenu,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
     QToolButton,
@@ -36,7 +39,10 @@ from neoribbon.workbench_map import (
     active_workbench_name,
     command_action_icon,
     command_actions_meta,
+    command_checkable_action,
+    command_qactions,
     workbench_entries,
+    workbench_toolbar_panels,
 )
 
 
@@ -263,6 +269,247 @@ def _open_command_help(command_name: str) -> None:
         App.Console.PrintError(f"NeoRibbon: could not open help for {page!r}: {exc}\n")
 
 
+def _sync_toggle_button(button: QToolButton, action) -> None:
+    """Copy checkable/checked/enabled from a live QAction onto a ribbon button."""
+    try:
+        checkable = bool(action.isCheckable())
+        button.setCheckable(checkable)
+        if checkable:
+            button.setChecked(bool(action.isChecked()))
+        else:
+            button.setChecked(False)
+        button.setEnabled(bool(action.isEnabled()))
+    except RuntimeError:
+        return
+    except Exception:
+        return
+
+
+class _ActionStateWatch(QObject):
+    """Keep a QToolButton's checked/enabled state aligned with a QAction."""
+
+    def __init__(self, button: QToolButton, action) -> None:
+        super().__init__(button)
+        self._button = button
+        self._action = action
+        _sync_toggle_button(button, action)
+        try:
+            action.toggled.connect(self._on_action_toggled)
+        except Exception:
+            pass
+        try:
+            action.changed.connect(self._on_action_changed)
+        except Exception:
+            pass
+
+    def _on_action_toggled(self, checked: bool) -> None:
+        try:
+            if self._button.isCheckable():
+                self._button.setChecked(bool(checked))
+        except RuntimeError:
+            pass
+
+    def _on_action_changed(self) -> None:
+        _sync_toggle_button(self._button, self._action)
+
+
+class _ActionButtonSync(_ActionStateWatch):
+    """
+    Watch a checkable FreeCAD QAction and run the command on click.
+
+    Parented to the button so connections die when the ribbon rebuilds.
+    The action is the source of truth for checked state.
+    """
+
+    def __init__(
+        self,
+        button: QToolButton,
+        action,
+        command_name: str,
+        action_index: int = 0,
+    ) -> None:
+        super().__init__(button, action)
+        self._name = command_name
+        self._index = action_index
+        button.clicked.connect(self._on_clicked)
+
+    def _on_clicked(self, _checked: bool = False) -> None:
+        _run_command(self._name, self._index)
+        _sync_toggle_button(self._button, self._action)
+        QTimer.singleShot(
+            0, lambda: _sync_toggle_button(self._button, self._action)
+        )
+
+
+class _UsageRecorder(QObject):
+    """Record command use when a live QAction is triggered; dies with parent."""
+
+    def __init__(self, command_name: str, parent: QObject) -> None:
+        super().__init__(parent)
+        self._name = command_name
+
+    def record(self, _checked: bool = False) -> None:
+        usage.record_use(self._name)
+
+
+def _bind_toggle_button(
+    button: QToolButton,
+    command: RibbonCommand,
+    action,
+    action_index: int = 0,
+) -> None:
+    """Make *button* checkable and keep it aligned with *action*."""
+    _ActionButtonSync(button, action, command.name, action_index)
+
+
+def _wire_command_button(
+    button: QToolButton,
+    command: RibbonCommand,
+    *,
+    allow_menu: bool = True,
+) -> None:
+    """Single-action click, toggle sync, or menu for FreeCAD compound commands."""
+    actions_meta = command_actions_meta(command.name)
+    qactions = command_qactions(command.name)
+    compound = (
+        allow_menu and command.action_count > 1 and len(actions_meta) > 1
+    )
+
+    if compound:
+        button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        menu = QMenu(button)
+        theme.apply_menu_theme(menu)
+        recorder = _UsageRecorder(command.name, button)
+        for index, text, tip in actions_meta:
+            qaction = qactions[index] if index < len(qactions) else None
+            if qaction is not None:
+                menu.addAction(qaction)
+                try:
+                    qaction.triggered.connect(recorder.record)
+                except Exception:
+                    pass
+            else:
+                item = menu.addAction(_icon_for(command, index), text)
+                item.setToolTip(tip)
+                item.triggered.connect(
+                    lambda _c=False, n=command.name, i=index: _run_command(n, i)
+                )
+        button.setMenu(menu)
+
+    toggle = command_checkable_action(command.name, 0)
+    if toggle is not None:
+        _bind_toggle_button(button, command, toggle, 0)
+        return
+    button.clicked.connect(
+        lambda _c=False, n=command.name: _run_command(n, 0)
+    )
+
+
+class SectionOrderDialog(QDialog):
+    """Drag (or move up/down) to set per-workbench ribbon group order."""
+
+    def __init__(
+        self,
+        current: list[str],
+        defaults: list[str],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Reorder sections")
+        self._defaults = list(defaults)
+        self._cleared = False
+
+        root = QVBoxLayout(self)
+        hint = QLabel(
+            "Drag to reorder ribbon groups for this workbench, or use "
+            "Move up / Move down. Hidden sections stay hidden. "
+            "New toolbars appear at the end until you reorder again."
+        )
+        hint.setWordWrap(True)
+        root.addWidget(hint)
+
+        self._list = QListWidget()
+        self._list.setObjectName("NeoRibbon_section_order_list")
+        self._list.setDragEnabled(True)
+        self._list.setAcceptDrops(True)
+        self._list.setDropIndicatorShown(True)
+        self._list.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self._list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self._list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._list.setMinimumWidth(280)
+        self._list.setMinimumHeight(220)
+        for name in current:
+            self._add_item(name)
+        self._list.model().rowsMoved.connect(self._on_rows_moved)
+        root.addWidget(self._list)
+
+        moves = QHBoxLayout()
+        up_btn = QPushButton("Move up")
+        down_btn = QPushButton("Move down")
+        reset_btn = QPushButton("Reset to default order")
+        up_btn.clicked.connect(lambda: self._move(-1))
+        down_btn.clicked.connect(lambda: self._move(1))
+        reset_btn.clicked.connect(self._reset)
+        moves.addWidget(up_btn)
+        moves.addWidget(down_btn)
+        moves.addStretch(1)
+        moves.addWidget(reset_btn)
+        root.addLayout(moves)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        root.addWidget(buttons)
+
+        self.resize(420, 380)
+
+    def _add_item(self, name: str) -> None:
+        item = QListWidgetItem(name)
+        item.setFlags(
+            Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+            | Qt.ItemFlag.ItemIsDragEnabled
+        )
+        self._list.addItem(item)
+
+    def _on_rows_moved(self, *_args) -> None:
+        self._cleared = False
+
+    def _move(self, delta: int) -> None:
+        row = self._list.currentRow()
+        if row < 0:
+            return
+        new = row + delta
+        if new < 0 or new >= self._list.count():
+            return
+        item = self._list.takeItem(row)
+        self._list.insertItem(new, item)
+        self._list.setCurrentRow(new)
+        self._cleared = False
+
+    def _reset(self) -> None:
+        self._list.clear()
+        for name in self._defaults:
+            self._add_item(name)
+        self._cleared = True
+        if self._list.count():
+            self._list.setCurrentRow(0)
+
+    @property
+    def cleared(self) -> bool:
+        """True when Reset was used and the list was not moved afterwards."""
+        return self._cleared
+
+    def names(self) -> list[str]:
+        return [
+            self._list.item(index).text()
+            for index in range(self._list.count())
+            if self._list.item(index) is not None
+        ]
+
+
 def _help_icon() -> QIcon:
     for candidate in (":/icons/help-browser.svg", "help-browser", "help-browser.svg"):
         try:
@@ -275,6 +522,76 @@ def _help_icon() -> QIcon:
         except Exception:
             continue
     return QIcon()
+
+
+def _available_geometry_at(global_pos: QPoint, widget: QWidget | None = None):
+    """Screen availableGeometry containing *global_pos* (multi-monitor safe)."""
+    screen = None
+    try:
+        screen = QGuiApplication.screenAt(global_pos)
+    except Exception:
+        screen = None
+    if screen is None and widget is not None:
+        try:
+            screen = widget.screen()
+        except Exception:
+            screen = None
+    if screen is None:
+        try:
+            screen = QGuiApplication.primaryScreen()
+        except Exception:
+            return None
+    try:
+        return screen.availableGeometry()
+    except Exception:
+        return None
+
+
+def _clamp_popup_to_screen(
+    popup: QWidget,
+    origin: QPoint,
+    *,
+    anchor_top: int | None = None,
+    margin: int = 6,
+) -> None:
+    """
+    Keep *popup* on the screen that contains *origin*.
+
+    *origin* is the preferred top-left (typically the group's bottom-left).
+    If the popup would hang off the bottom, flip it above *anchor_top*.
+    """
+    geo = _available_geometry_at(origin, popup)
+    if geo is None:
+        popup.move(origin)
+        return
+    size = popup.frameGeometry().size()
+    if size.width() <= 0 or size.height() <= 0:
+        size = popup.sizeHint()
+    width = max(size.width(), popup.width())
+    height = max(size.height(), popup.height())
+
+    left = geo.x()
+    top = geo.y()
+    right = geo.x() + geo.width()
+    bottom = geo.y() + geo.height()
+
+    x = origin.x()
+    y = origin.y()
+    if x + width + margin > right:
+        x = right - width - margin
+    if x < left + margin:
+        x = left + margin
+
+    if y + height + margin > bottom:
+        above = (anchor_top if anchor_top is not None else origin.y()) - height
+        if above >= top + margin:
+            y = above
+        else:
+            y = bottom - height - margin
+    if y < top + margin:
+        y = top + margin
+
+    popup.move(x, y)
 
 
 class WorkbenchSelector(QWidget):
@@ -464,6 +781,9 @@ class SectionListPopup(QFrame):
         run_btn.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
+        toggle = command_checkable_action(command.name, 0)
+        if toggle is not None:
+            _ActionStateWatch(run_btn, toggle)
         run_btn.clicked.connect(lambda _c=False, n=command.name: self._activate(n))
         layout.addWidget(run_btn, 1)
 
@@ -669,12 +989,23 @@ class RibbonGroup(QWidget):
         )
         self._popup = popup
 
-        # Anchor under this group’s bottom edge.
+        # Anchor under this group’s bottom-left; clamp so it stays on-screen.
         origin = self.mapToGlobal(QPoint(0, self.height()))
-        popup.move(origin)
+        anchor_top = self.mapToGlobal(QPoint(0, 0)).y()
+        popup.adjustSize()
+        _clamp_popup_to_screen(popup, origin, anchor_top=anchor_top)
         popup.show()
         popup.raise_()
         popup.activateWindow()
+
+        def _reclamp() -> None:
+            try:
+                if popup.isVisible():
+                    _clamp_popup_to_screen(popup, origin, anchor_top=anchor_top)
+            except RuntimeError:
+                pass
+
+        QTimer.singleShot(0, _reclamp)
 
     def _hide_section(self) -> None:
         prefs.set_section_hidden(self._panel_name, True)
@@ -717,7 +1048,7 @@ class RibbonGroup(QWidget):
             side = max(style.large_icon.width() + 12, style.content_height - 8)
             button.setFixedWidth(side)
         button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        self._wire_command_button(button, command)
+        _wire_command_button(button, command)
         return button
 
     def _small_button(self, command: RibbonCommand) -> QToolButton:
@@ -749,31 +1080,8 @@ class RibbonGroup(QWidget):
             side = max(style.small_icon.width() + 8, style.small_btn_height)
             button.setFixedSize(side, style.small_btn_height)
         button.setToolTip(tip)
-        self._wire_command_button(button, command)
+        _wire_command_button(button, command)
         return button
-
-    def _wire_command_button(self, button: QToolButton, command: RibbonCommand) -> None:
-        """Single-action click, or menu for FreeCAD compound commands."""
-        actions = command_actions_meta(command.name)
-        if command.action_count > 1 and len(actions) > 1:
-            button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
-            menu = QMenu(button)
-            theme.apply_menu_theme(menu)
-            for index, text, tip in actions:
-                action = menu.addAction(_icon_for(command, index), text)
-                action.setToolTip(tip)
-                action.triggered.connect(
-                    lambda _c=False, n=command.name, i=index: _run_command(n, i)
-                )
-            button.setMenu(menu)
-            # Primary click runs the first action (e.g. New Sketch).
-            button.clicked.connect(
-                lambda _c=False, n=command.name: _run_command(n, 0)
-            )
-        else:
-            button.clicked.connect(
-                lambda _c=False, n=command.name: _run_command(n, 0)
-            )
 
 
 class RibbonBar(QWidget):
@@ -967,6 +1275,7 @@ class RibbonBar(QWidget):
                 (panel.name, tuple(cmd.name for cmd in panel.commands))
                 for panel in panels
             ),
+            tuple(prefs.section_order(active_workbench_name())),
         )
         if not force and signature == self._last_signature:
             return
@@ -1029,7 +1338,7 @@ class RibbonBar(QWidget):
         button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         button.setText("Sections ▾")
-        button.setToolTip("Show or hide ribbon sections")
+        button.setToolTip("Show, hide, or reorder ribbon sections")
         button.setFixedHeight(style.content_height - 4)
         theme.apply_chrome_palette(button)
 
@@ -1045,6 +1354,13 @@ class RibbonBar(QWidget):
             action.toggled.connect(
                 lambda checked, n=panel.name: self._set_section_visible(n, checked)
             )
+        menu.addSeparator()
+        reorder = menu.addAction("Reorder sections…")
+        reorder.triggered.connect(self._open_reorder_dialog)
+        wb = active_workbench_name()
+        if prefs.section_order(wb):
+            reset = menu.addAction("Reset section order")
+            reset.triggered.connect(self._reset_section_order)
         if hidden:
             menu.addSeparator()
             show_all = menu.addAction("Show all sections")
@@ -1058,6 +1374,29 @@ class RibbonBar(QWidget):
 
     def _show_all_sections(self) -> None:
         prefs.set_hidden_sections([])
+        self.refresh(force=True)
+
+    def _reset_section_order(self) -> None:
+        prefs.clear_section_order(active_workbench_name())
+        self.refresh(force=True)
+
+    def _open_reorder_dialog(self) -> None:
+        current = [panel.name for panel in self._all_panels]
+        defaults = [panel.name for panel in workbench_toolbar_panels()]
+        if not current and not defaults:
+            return
+        try:
+            parent = Gui.getMainWindow()
+        except Exception:
+            parent = self.window()
+        dialog = SectionOrderDialog(current or defaults, defaults, parent)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        workbench = active_workbench_name()
+        if dialog.cleared:
+            prefs.clear_section_order(workbench)
+        else:
+            prefs.set_section_order(workbench, dialog.names())
         self.refresh(force=True)
 
     @property

@@ -144,10 +144,34 @@ def _icon_for(command: RibbonCommand, action_index: int = 0) -> QIcon:
     return QIcon()
 
 
+def _trigger_checkable_action(action) -> bool:
+    """Trigger a live checkable QAction so FreeCAD updates its checked state.
+
+    Draft snap tools (Snap Lock, Endpoint, …) implement Activated(status) and
+    only stay in sync when the QAction is clicked. Gui.runCommand(name, 0)
+    calls Activated(0), which forces the snap off and never toggles the action
+    — unlike the keyboard shortcut, which goes through QAction.trigger().
+    """
+    if action is None:
+        return False
+    try:
+        if not action.isCheckable():
+            return False
+        action.trigger()
+        return True
+    except RuntimeError:
+        return False
+    except Exception:
+        return False
+
+
 def _run_command(name: str, index: int = 0) -> None:
     if not name:
         return
     usage.record_use(name)
+    actions = command_qactions(name)
+    if 0 <= index < len(actions) and _trigger_checkable_action(actions[index]):
+        return
     try:
         Gui.runCommand(name, index)
     except TypeError:
@@ -334,7 +358,13 @@ class _ActionButtonSync(_ActionStateWatch):
         button.clicked.connect(self._on_clicked)
 
     def _on_clicked(self, _checked: bool = False) -> None:
-        _run_command(self._name, self._index)
+        # Qt already toggled this checkable button; the action is source of truth.
+        # Prefer QAction.trigger() so checkable commands (Snap Lock) update like
+        # the shortcut. Do not also runCommand — that can skip or fight the action.
+        if _trigger_checkable_action(self._action):
+            usage.record_use(self._name)
+        else:
+            _run_command(self._name, self._index)
         _sync_toggle_button(self._button, self._action)
         QTimer.singleShot(
             0, lambda: _sync_toggle_button(self._button, self._action)

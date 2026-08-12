@@ -406,24 +406,26 @@ def _wire_command_button(
 
 
 class SectionOrderDialog(QDialog):
-    """Drag (or move up/down) to set per-workbench ribbon group order."""
+    """Drag (or move up/down) to set per-workbench ribbon group order and visibility."""
 
     def __init__(
         self,
         current: list[str],
         defaults: list[str],
+        hidden: frozenset[str] | set[str] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Reorder sections")
         self._defaults = list(defaults)
         self._cleared = False
+        hidden_set = set(hidden or ())
 
         root = QVBoxLayout(self)
         hint = QLabel(
-            "Drag to reorder ribbon groups for this workbench, or use "
-            "Move up / Move down. Hidden sections stay hidden. "
-            "New toolbars appear at the end until you reorder again."
+            "Drag or use Move up / Move down to reorder groups for this "
+            "workbench. Check a group to show it on the ribbon; uncheck to "
+            "hide it. Hidden groups stay listed so you can turn them back on."
         )
         hint.setWordWrap(True)
         root.addWidget(hint)
@@ -439,7 +441,8 @@ class SectionOrderDialog(QDialog):
         self._list.setMinimumWidth(280)
         self._list.setMinimumHeight(220)
         for name in current:
-            self._add_item(name)
+            self._add_item(name, name not in hidden_set)
+        self._list.itemChanged.connect(self._on_item_changed)
         self._list.model().rowsMoved.connect(self._on_rows_moved)
         root.addWidget(self._list)
 
@@ -465,14 +468,29 @@ class SectionOrderDialog(QDialog):
 
         self.resize(420, 380)
 
-    def _add_item(self, name: str) -> None:
+    def _add_item(self, name: str, visible: bool = True) -> None:
         item = QListWidgetItem(name)
         item.setFlags(
             Qt.ItemFlag.ItemIsEnabled
             | Qt.ItemFlag.ItemIsSelectable
             | Qt.ItemFlag.ItemIsDragEnabled
+            | Qt.ItemFlag.ItemIsUserCheckable
         )
+        item.setCheckState(
+            Qt.CheckState.Checked if visible else Qt.CheckState.Unchecked
+        )
+        item.setToolTip("Show this section on the ribbon" if visible else "Hidden from the ribbon")
         self._list.addItem(item)
+
+    def _on_item_changed(self, item: QListWidgetItem) -> None:
+        visible = item.checkState() == Qt.CheckState.Checked
+        tip = (
+            "Show this section on the ribbon"
+            if visible
+            else "Hidden from the ribbon"
+        )
+        if item.toolTip() != tip:
+            item.setToolTip(tip)
 
     def _on_rows_moved(self, *_args) -> None:
         self._cleared = False
@@ -490,9 +508,10 @@ class SectionOrderDialog(QDialog):
         self._cleared = False
 
     def _reset(self) -> None:
+        visible = self.visibility()
         self._list.clear()
         for name in self._defaults:
-            self._add_item(name)
+            self._add_item(name, visible.get(name, True))
         self._cleared = True
         if self._list.count():
             self._list.setCurrentRow(0)
@@ -508,6 +527,16 @@ class SectionOrderDialog(QDialog):
             for index in range(self._list.count())
             if self._list.item(index) is not None
         ]
+
+    def visibility(self) -> dict[str, bool]:
+        """Section name → currently checked (visible on the ribbon)."""
+        result: dict[str, bool] = {}
+        for index in range(self._list.count()):
+            item = self._list.item(index)
+            if item is None:
+                continue
+            result[item.text()] = item.checkState() == Qt.CheckState.Checked
+        return result
 
 
 def _help_icon() -> QIcon:
@@ -1389,7 +1418,12 @@ class RibbonBar(QWidget):
             parent = Gui.getMainWindow()
         except Exception:
             parent = self.window()
-        dialog = SectionOrderDialog(current or defaults, defaults, parent)
+        dialog = SectionOrderDialog(
+            current or defaults,
+            defaults,
+            prefs.hidden_sections(),
+            parent,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         workbench = active_workbench_name()
@@ -1397,6 +1431,8 @@ class RibbonBar(QWidget):
             prefs.clear_section_order(workbench)
         else:
             prefs.set_section_order(workbench, dialog.names())
+        for name, visible in dialog.visibility().items():
+            prefs.set_section_hidden(name, not visible)
         self.refresh(force=True)
 
     @property

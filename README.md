@@ -88,7 +88,7 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 - **Ignored toolbars** — semicolon-separated FreeCAD toolbar names to skip permanently
 - **Section order** — per-workbench group order under `SectionOrder/<workbench>` (semicolon-separated names); new toolbars append after the saved list
 
-**Sections:** click the section footer (except **×**) for a full labeled command list (with shortcuts in parentheses when set); use the **pin** on each row to keep that command in the focus strip. The list stays on-screen if the group is scrolled off the edge. **×** hides the section; **Sections ▾** shows/hides groups and has **Reorder sections…** (drag or move up/down; per workbench). **Reset section order** restores the workbench toolbar order.
+**Sections:** click the section footer (except **×**) for a full labeled command list (with shortcuts in parentheses when set); use the **pin** on each row to keep that command in the focus strip. The list stays on-screen if the group is scrolled off the edge. **×** hides the section; **Sections ▾** shows/hides groups and has **Reorder sections…** (checkbox to show/hide; drag or move up/down for order; per workbench). Hidden groups stay in that list so you can turn them back on. **Reset section order** restores the workbench toolbar order.
 
 **Toggles:** ribbon buttons for checkable FreeCAD commands (snap-to-grid, B-spline helpers, and similar) stay visually pressed/checked in sync with the command. Ordinary commands are not faked as toggles.
 
@@ -109,7 +109,7 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 4. Set an ignored toolbar name → that tab is omitted after refresh.
 5. Change button size → buttons update on next refresh.
 6. Report View shows no cascade of swallowed exceptions from NeoRibbon.
-7. **Sections ▾ → Reorder sections…** — drag a group; ribbon updates immediately; reset restores workbench order.
+7. **Sections ▾ → Reorder sections…** — uncheck a group then OK to hide it; check to show again; drag or move up/down reorders; reset restores workbench order (visibility is kept).
 8. Toggle a checkable command (e.g. Draft snap, Sketcher helper) — ribbon button stays sunken while on.
 9. Scroll the ribbon so a group is near the left/right edge, open its ▾ list — popup stays fully on screen.
 

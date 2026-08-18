@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import xml.etree.ElementTree as ET
 from typing import Iterable
@@ -15,29 +16,22 @@ BUTTON_SIZES = ("small", "medium", "large")
 DEFAULT_BUTTON_SIZE = "medium"
 DEFAULT_VISIBLE_PER_SECTION = 6
 
-# Application shortcuts (QShortcut). Empty stored value means use the default.
+# Application shortcut (QShortcut). Empty stored value means use the default.
 SHORTCUT_ROWS: tuple[tuple[str, str], ...] = (
     ("toggle", "Toggle ribbon"),
-    ("restore", "Restore classic toolbars"),
-    ("prefs", "Open preferences"),
 )
 SHORTCUT_KINDS = tuple(kind for kind, _label in SHORTCUT_ROWS)
 SHORTCUT_LABELS = {kind: label for kind, label in SHORTCUT_ROWS}
 SHORTCUT_DEFAULTS = {
     "toggle": "Ctrl+Shift+N",
-    "restore": "Ctrl+Shift+R",
-    "prefs": "Ctrl+Shift+,",
 }
 SHORTCUT_PARAMS = {
     "toggle": "ShortcutToggle",
-    "restore": "ShortcutRestore",
-    "prefs": "ShortcutPrefs",
 }
 SHORTCUT_OBJECT_NAMES = {
     "toggle": "NeoRibbon_shortcut_toggle",
-    "restore": "NeoRibbon_shortcut_restore",
-    "prefs": "NeoRibbon_shortcut_prefs",
 }
+_RETIRED_SHORTCUT_PARAMS = ("ShortcutRestore", "ShortcutPrefs")
 
 # Keep one ParamGet wrapper alive. ParameterGrpPy::~ParameterGrpPy Detach()es
 # observers, so Attach() on a temporary App.ParamGet(...) is a no-op after GC.
@@ -100,8 +94,36 @@ def is_enabled() -> bool:
     return bool(group.GetBool("Enabled", True))
 
 
+def _flush_user_params() -> None:
+    """Write user.cfg so the last ribbon/classic mode survives a restart."""
+    try:
+        saver = getattr(App, "saveParameter", None)
+        if callable(saver):
+            saver()
+    except Exception:
+        pass
+
+
+def sync_last_mode_from_enabled() -> None:
+    """Keep LastMode in sync with Enabled (PrefCheckBox may write Enabled alone)."""
+    _group().SetString("LastMode", "ribbon" if is_enabled() else "classic")
+
+
+def last_mode_ribbon() -> bool:
+    """True when the last session left the ribbon on (default for a new install)."""
+    mode = _group().GetString("LastMode", "").strip().lower()
+    if mode == "classic":
+        return False
+    if mode == "ribbon":
+        return True
+    return is_enabled()
+
+
 def set_enabled(value: bool) -> None:
-    _group().SetBool("Enabled", bool(value))
+    enabled = bool(value)
+    _group().SetBool("Enabled", enabled)
+    _group().SetString("LastMode", "ribbon" if enabled else "classic")
+    _flush_user_params()
 
 
 def button_size_index() -> int:
@@ -242,6 +264,43 @@ def set_ignored_toolbars_text(text: str) -> None:
     set_ignored_toolbars(text.split(";"))
 
 
+PREF_TOOLBAR_SNAPSHOT = "ToolbarSnapshot"
+
+
+def toolbar_snapshot() -> dict | None:
+    """Persisted classic-toolbar visibility, rows, and options, or None."""
+    raw = _group().GetString(PREF_TOOLBAR_SNAPSHOT, "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    hidden = data.get("hidden")
+    order = data.get("order")
+    if not isinstance(hidden, list) or not isinstance(order, dict):
+        return None
+    return data
+
+
+def set_toolbar_snapshot(data: dict) -> None:
+    _group().SetString(
+        PREF_TOOLBAR_SNAPSHOT, json.dumps(data, separators=(",", ":"))
+    )
+
+
+def clear_toolbar_snapshot() -> None:
+    """Drop a bad ToolbarSnapshot so the next restore does not re-hide bars."""
+    group = _group()
+    try:
+        group.RemString(PREF_TOOLBAR_SNAPSHOT)
+    except Exception:
+        group.SetString(PREF_TOOLBAR_SNAPSHOT, "")
+    _flush_user_params()
+
+
 def shortcut_default(kind: str) -> str:
     return SHORTCUT_DEFAULTS[kind]
 
@@ -260,6 +319,16 @@ def set_shortcut(kind: str, value: str) -> None:
 
 def shortcut_map() -> dict[str, str]:
     return {kind: shortcut(kind) for kind in SHORTCUT_KINDS}
+
+
+def clear_retired_shortcuts() -> None:
+    """Drop restore/prefs shortcut params from older NeoRibbon versions."""
+    group = _group()
+    for key in _RETIRED_SHORTCUT_PARAMS:
+        try:
+            group.RemString(key)
+        except Exception:
+            pass
 
 
 def hidden_sections() -> frozenset[str]:

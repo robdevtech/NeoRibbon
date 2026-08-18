@@ -18,8 +18,8 @@ def _icon_path(name: str) -> str:
 
 
 # Accel is omitted from GetResources: a QAction Accel would double-fire with
-# the application QShortcut bound in bootstrap. Chords are user-editable in
-# preferences (ShortcutToggle / ShortcutRestore / ShortcutPrefs).
+# the application QShortcut bound in bootstrap. The toggle chord is
+# user-editable in preferences (ShortcutToggle).
 
 
 class _ToggleCommand:
@@ -42,11 +42,10 @@ class _ToggleCommand:
 
 class _PreferencesCommand:
     def GetResources(self):
-        seq = prefs.shortcut("prefs")
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "NeoRibbon preferences…",
-            "ToolTip": f"Open NeoRibbon settings ({seq})",
+            "ToolTip": "Open NeoRibbon settings",
         }
 
     def Activated(self):
@@ -60,13 +59,12 @@ class _PreferencesCommand:
 
 class _RestoreToolbarsCommand:
     def GetResources(self):
-        seq = prefs.shortcut("restore")
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "Restore classic toolbars",
             "ToolTip": (
-                "Show FreeCAD toolbars hidden by NeoRibbon "
-                f"({seq})"
+                "Re-dock FreeCAD toolbars (including ones missing from "
+                "View → Toolbars) and disable the ribbon"
             ),
         }
 

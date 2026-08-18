@@ -169,10 +169,20 @@
    <item>
     <widget class="QLabel" name="labelShortcutsHint">
      <property name="text">
-      <string>Click a field, then press keys. Reset restores the default. A shortcut already used elsewhere is rejected immediately.</string>
+      <string>Click the field, then press keys. Reset restores the default. A used chord is rejected immediately. A valid chord is saved as soon as you record it.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="buttonRestoreClassic">
+     <property name="text">
+      <string>Restore classic toolbars</string>
+     </property>
+     <property name="toolTip">
+      <string>Show the toolbars NeoRibbon hid and disable the ribbon. Takes effect immediately (does not wait for Apply).</string>
      </property>
     </widget>
    </item>
@@ -189,7 +199,7 @@
    <item>
     <widget class="QLabel" name="labelVersion">
      <property name="text">
-      <string>NeoRibbon 0.3.0</string>
+      <string>NeoRibbon 0.3.5</string>
      </property>
      <property name="toolTip">
       <string>Installed addon version from package.xml</string>

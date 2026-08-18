@@ -193,6 +193,15 @@ def _revert_recorder(edit) -> None:
     set_recorded_shortcut(edit, fallback, default=default or fallback, validate=False)
 
 
+def _notify_shortcut_accepted(edit, seq: str) -> None:
+    callback = getattr(edit, "_on_shortcut_accepted", None)
+    if callable(callback):
+        try:
+            callback(seq)
+        except Exception:
+            pass
+
+
 def _validate_recorder(edit, *, interactive: bool, defer: bool) -> bool:
     if edit is None or getattr(edit, "_suppress_conflict_check", False):
         return True
@@ -205,6 +214,7 @@ def _validate_recorder(edit, *, interactive: bool, defer: bool) -> bool:
     conflicts = _conflicts_for(edit, seq)
     if not conflicts:
         edit._accepted_shortcut = seq
+        _notify_shortcut_accepted(edit, seq)
         return True
 
     _revert_recorder(edit)

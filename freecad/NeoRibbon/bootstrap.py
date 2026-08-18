@@ -10,7 +10,7 @@ import FreeCAD as App
 import FreeCADGui as Gui
 from PySide.QtCore import QFileSystemWatcher, QTimer, Qt
 from PySide.QtGui import QKeySequence, QShortcut
-from PySide.QtWidgets import QMainWindow, QMessageBox, QToolBar
+from PySide.QtWidgets import QApplication, QMainWindow, QMessageBox, QToolBar
 
 from freecad.NeoRibbon import prefs
 from freecad.NeoRibbon.commands import register as register_commands
@@ -29,6 +29,7 @@ _pref_observer = None
 _pref_apply_pending = False
 _escape_shortcuts: list = []
 _fs_watcher: Optional[QFileSystemWatcher] = None
+_quit_hooked = False
 _AM_STOPFILE = "ADDON_DISABLED"
 
 # Keys written by Edit → Preferences → NeoRibbon (and Tools dialog).
@@ -114,9 +115,12 @@ def _ensure_am_watcher() -> None:
 
 
 def _on_workbench_activated(_name: str = "") -> None:
-    """Refresh ribbon after FreeCAD finishes activating a workbench."""
+    """Re-apply last ribbon/classic mode after a workbench finishes loading."""
     global _refresh_pending
-    if not prefs.is_enabled() or addon_disabled_by_manager() or _dock is None:
+    if addon_disabled_by_manager():
+        return
+    if not prefs.last_mode_ribbon():
+        # Classic last: let FreeCAD show this workbench's toolbars.
         return
     if _refresh_pending:
         return
@@ -125,20 +129,56 @@ def _on_workbench_activated(_name: str = "") -> None:
     def _do_refresh() -> None:
         global _refresh_pending
         _refresh_pending = False
-        if not prefs.is_enabled() or addon_disabled_by_manager() or _dock is None:
+        if addon_disabled_by_manager() or not prefs.last_mode_ribbon():
             return
         try:
-            if _controller is not None:
-                _controller.enable_guard()
-                _controller.hide_classic_deferred()
-                _controller.show_menubar()
-            if _dock is not None and _dock.isVisible():
-                _dock.refresh()
+            _show_ribbon()
         except Exception as exc:  # noqa: BLE001
             App.Console.PrintError(f"NeoRibbon: refresh failed: {exc}\n")
 
     # Single deferred shot so toolbar items exist; never poll in a loop.
     QTimer.singleShot(0, _do_refresh)
+
+
+def _apply_last_mode() -> None:
+    """Show ribbon or classic toolbars to match the last session."""
+    global _refresh_pending
+    if not _installed:
+        return
+    if addon_disabled_by_manager() or not prefs.last_mode_ribbon():
+        _refresh_pending = False
+        _hide_ribbon(restore_toolbars=True)
+        return
+    _show_ribbon()
+
+
+def _on_about_to_quit() -> None:
+    """Keep LastMode, and do not collapse a healthy classic layout on exit."""
+    if _controller is None:
+        return
+    try:
+        if prefs.last_mode_ribbon():
+            # Ribbon was on: put classic bars back so Qt does not save empty chrome.
+            _controller.restore_all_toolbars(touch_menubar=False, defer=False)
+        else:
+            # Classic was on: record what is visible; do not rebuild from snapshot.
+            _controller.capture_visible_layout()
+    except Exception:
+        pass
+
+
+def _ensure_quit_hook() -> None:
+    global _quit_hooked
+    if _quit_hooked:
+        return
+    try:
+        app = QApplication.instance()
+        if app is None:
+            return
+        app.aboutToQuit.connect(_on_about_to_quit)
+        _quit_hooked = True
+    except Exception:
+        pass
 
 
 def _ensure_dock() -> RibbonDock:
@@ -181,7 +221,7 @@ def _hide_ribbon(restore_toolbars: bool = True) -> None:
     if restore_toolbars:
         if _controller is None:
             _controller = ToolbarController()
-        # Only bars this session hid — never force-show user-hidden toolbars.
+        # Restore the user's saved classic toolbar layout.
         _controller.restore_all_toolbars()
 
 
@@ -190,16 +230,12 @@ def apply_prefs() -> None:
     global _refresh_pending
     if not _installed:
         return
-    if addon_disabled_by_manager() or not prefs.is_enabled():
-        # Drop a queued workbench refresh so it cannot re-show after hide.
-        _refresh_pending = False
-        _hide_ribbon(restore_toolbars=True)
-        return
-    _show_ribbon()
-    if _dock is not None:
+    prefs.sync_last_mode_from_enabled()
+    _apply_last_mode()
+    if prefs.last_mode_ribbon() and _dock is not None:
         _dock.refresh(force=True)
-    if _controller is not None:
-        _controller.show_menubar()
+        if _controller is not None:
+            _controller.show_menubar()
 
 
 def toggle() -> None:
@@ -210,28 +246,24 @@ def toggle() -> None:
 
 
 def restore_toolbars() -> None:
-    """Emergency recovery: classic toolbars + menu bar, ribbon off."""
-    global _controller
+    """Emergency recovery: re-dock classic toolbars + menu bar, ribbon off."""
+    global _controller, _dock
     if _controller is None:
         _controller = ToolbarController()
     prefs.clear_legacy_hide_menubar()
     prefs.set_enabled(False)
-    _hide_ribbon(restore_toolbars=True)
-    App.Console.PrintMessage(
-        "NeoRibbon: restored classic UI (toolbars + menu bar); ribbon disabled\n"
-    )
-
-
-def _open_preferences() -> None:
-    from freecad.NeoRibbon.prefs_dialog import open_preferences_dialog
-
-    open_preferences_dialog()
+    if _dock is not None:
+        _dock.hide()
+        try:
+            _dock.setVisible(False)
+        except Exception:
+            pass
+    # Re-dock bars that removeToolBar dropped out of View → Toolbars.
+    _controller.recover_all_toolbars()
 
 
 _SHORTCUT_SLOTS = {
     "toggle": toggle,
-    "restore": restore_toolbars,
-    "prefs": _open_preferences,
 }
 
 
@@ -417,8 +449,8 @@ def _register_escape_shortcuts() -> None:
 
     FreeCAD Accel on Tools menu actions can be unreliable; QShortcut with
     ApplicationShortcut stays available. Skip a binding when another command
-    or widget already owns the sequence. Chords come from preferences
-    (defaults: Ctrl+Shift+N / R / ,).
+    or widget already owns the sequence. The toggle chord comes from
+    preferences (default: Ctrl+Shift+N).
     """
     try_set_shortcuts(interactive=False, persist=False)
 
@@ -476,6 +508,7 @@ def install() -> None:
 
     # Older versions could hide the menu bar; clear that and always show it.
     prefs.clear_legacy_hide_menubar()
+    prefs.clear_retired_shortcuts()
     _controller.show_menubar()
 
     _pref_observer = _PrefObserver()
@@ -500,13 +533,17 @@ def install() -> None:
         toolbar.installEventFilter(_controller)
 
     _ensure_am_watcher()
+    _ensure_quit_hook()
 
-    if addon_disabled_by_manager() or not prefs.is_enabled():
-        # Enabled-off or AM-disabled this session: never leave chrome empty.
+    # Apply last session mode after FreeCAD restores window/toolbar state.
+    # Shot 0: as soon as the event loop runs. Shot 400: after typical restoreState.
+    if addon_disabled_by_manager():
         _hide_ribbon(restore_toolbars=True)
     else:
-        # Defer first build until a real workbench is up.
-        QTimer.singleShot(0, _show_ribbon)
+        mode = "ribbon" if prefs.last_mode_ribbon() else "classic"
+        App.Console.PrintLog(f"NeoRibbon: starting in {mode} mode\n")
+        QTimer.singleShot(0, _apply_last_mode)
+        QTimer.singleShot(400, _apply_last_mode)
 
     App.Console.PrintLog("NeoRibbon installed\n")
 
@@ -514,7 +551,7 @@ def install() -> None:
 def uninstall() -> None:
     """Restore classic UI and disconnect signals."""
     global _installed, _dock, _controller, _refresh_pending, _pref_observer
-    global _escape_shortcuts, _fs_watcher
+    global _escape_shortcuts, _fs_watcher, _quit_hooked
     if not _installed:
         # Still restore if a previous session hid toolbars.
         _hide_ribbon(restore_toolbars=True)
@@ -540,6 +577,14 @@ def uninstall() -> None:
         except Exception:
             pass
         _fs_watcher = None
+    if _quit_hooked:
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                app.aboutToQuit.disconnect(_on_about_to_quit)
+        except Exception:
+            pass
+        _quit_hooked = False
     for shortcut in _escape_shortcuts:
         try:
             shortcut.setParent(None)

@@ -91,7 +91,7 @@ def run() -> None:
             log(f"version_label={_version_label_text()!r}")
             pass_fail(
                 "package.xml version",
-                prefs.addon_version() == "0.2.8",
+                prefs.addon_version() == "0.3.0",
                 prefs.addon_version(),
             )
 
@@ -168,7 +168,7 @@ def run() -> None:
             log(f"pref page version label={ver!r}")
             pass_fail(
                 "pref page version label",
-                "0.2.6" in ver and ver.startswith("NeoRibbon"),
+                prefs.addon_version() in ver and ver.startswith("NeoRibbon"),
                 ver,
             )
             page.form.checkEnabled.setChecked(True)

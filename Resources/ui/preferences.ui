@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>420</width>
-    <height>290</height>
+    <width>440</width>
+    <height>430</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -159,9 +159,27 @@
     </layout>
    </item>
    <item>
+    <widget class="QGroupBox" name="groupShortcuts">
+     <property name="title">
+      <string>Keyboard shortcuts</string>
+     </property>
+     <layout class="QFormLayout" name="formShortcuts"/>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="labelShortcutsHint">
+     <property name="text">
+      <string>Click a field, then press keys. Reset restores the default. A shortcut already used elsewhere is rejected immediately.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
-      <string>Each section shows your most-used commands; the rest are under More. Hide or reorder sections from Sections. Button size changes icon and ribbon height. Ctrl+Shift+R restores classic toolbars if needed. Apply or OK updates the ribbon immediately.</string>
+      <string>Each section shows your most-used commands; the rest are under More. Hide or reorder sections from Sections. Button size changes icon and ribbon height. Apply or OK updates the ribbon immediately.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -171,7 +189,7 @@
    <item>
     <widget class="QLabel" name="labelVersion">
      <property name="text">
-      <string>NeoRibbon 0.2.6</string>
+      <string>NeoRibbon 0.3.0</string>
      </property>
      <property name="toolTip">
       <string>Installed addon version from package.xml</string>

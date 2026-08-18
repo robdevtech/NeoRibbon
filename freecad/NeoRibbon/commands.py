@@ -17,13 +17,18 @@ def _icon_path(name: str) -> str:
     return os.path.join(_ICON_DIR, name)
 
 
+# Accel is omitted from GetResources: a QAction Accel would double-fire with
+# the application QShortcut bound in bootstrap. Chords are user-editable in
+# preferences (ShortcutToggle / ShortcutRestore / ShortcutPrefs).
+
+
 class _ToggleCommand:
     def GetResources(self):
+        seq = prefs.shortcut("toggle")
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "Toggle NeoRibbon",
-            "ToolTip": "Enable or disable the NeoRibbon dock (Ctrl+Shift+N)",
-            "Accel": "Ctrl+Shift+N",
+            "ToolTip": f"Enable or disable the NeoRibbon dock ({seq})",
         }
 
     def Activated(self):
@@ -37,11 +42,11 @@ class _ToggleCommand:
 
 class _PreferencesCommand:
     def GetResources(self):
+        seq = prefs.shortcut("prefs")
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "NeoRibbon preferences…",
-            "ToolTip": "Open NeoRibbon settings (Ctrl+Shift+,)",
-            "Accel": "Ctrl+Shift+,",
+            "ToolTip": f"Open NeoRibbon settings ({seq})",
         }
 
     def Activated(self):
@@ -55,14 +60,14 @@ class _PreferencesCommand:
 
 class _RestoreToolbarsCommand:
     def GetResources(self):
+        seq = prefs.shortcut("restore")
         return {
             "Pixmap": _icon_path("NeoRibbon.svg"),
             "MenuText": "Restore classic toolbars",
             "ToolTip": (
                 "Show FreeCAD toolbars hidden by NeoRibbon "
-                "(Ctrl+Shift+R)"
+                f"({seq})"
             ),
-            "Accel": "Ctrl+Shift+R",
         }
 
     def Activated(self):

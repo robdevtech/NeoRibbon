@@ -11,13 +11,23 @@ from PySide.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QSpinBox,
     QVBoxLayout,
+    QWidget,
 )
 
 from freecad.NeoRibbon import prefs
+from freecad.NeoRibbon.shortcut_conflicts import sequences_match
+from freecad.NeoRibbon.shortcut_edit import (
+    create_reset_shortcut_button,
+    create_shortcut_recorder,
+    recorded_shortcut_text,
+    set_recorded_shortcut,
+)
 
 
 def _version_label_text() -> str:
@@ -29,6 +39,69 @@ def _ui_path() -> str:
     return os.path.join(prefs.addon_root(), "Resources", "ui", "preferences.ui")
 
 
+def _sibling_conflicts(edits: dict[str, object], kind: str, seq: str) -> list[str]:
+    """Reject a chord already shown on another NeoRibbon recorder in this form."""
+    labels: list[str] = []
+    for other_kind, other_edit in edits.items():
+        if other_kind == kind:
+            continue
+        other = recorded_shortcut_text(other_edit) or prefs.shortcut_default(other_kind)
+        if other and sequences_match(seq, other):
+            labels.append(
+                f"already assigned to {prefs.SHORTCUT_LABELS[other_kind]}"
+            )
+    return labels
+
+
+def _install_shortcut_editors(parent, form_layout, on_reset) -> dict[str, object]:
+    """Add recorder + Reset rows to a QFormLayout. Returns kind → edit."""
+    edits: dict[str, object] = {}
+    for kind, label in prefs.SHORTCUT_ROWS:
+        edit = create_shortcut_recorder(
+            parent, default=prefs.shortcut_default(kind)
+        )
+        reset = create_reset_shortcut_button(
+            parent, default=prefs.shortcut_default(kind)
+        )
+        reset.clicked.connect(lambda *args, k=kind: on_reset(k))
+        row = QWidget(parent)
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(edit, 1)
+        layout.addWidget(reset)
+        form_layout.addRow(label, row)
+        edits[kind] = edit
+    for kind, edit in edits.items():
+        edit._extra_conflicts = (  # noqa: SLF001 — live sibling check
+            lambda seq, k=kind: _sibling_conflicts(edits, k, seq)
+        )
+    return edits
+
+
+def _load_shortcut_fields(edits: dict[str, object]) -> None:
+    for kind, edit in edits.items():
+        default = prefs.shortcut_default(kind)
+        set_recorded_shortcut(edit, prefs.shortcut(kind), default=default)
+
+
+def _reset_shortcut_field(edits: dict[str, object], kind: str) -> None:
+    default = prefs.shortcut_default(kind)
+    set_recorded_shortcut(
+        edits.get(kind), default, default=default, validate=True
+    )
+
+
+def _save_shortcut_fields(edits: dict[str, object]) -> None:
+    from freecad.NeoRibbon import bootstrap
+
+    desired = {
+        kind: recorded_shortcut_text(edit) or prefs.shortcut_default(kind)
+        for kind, edit in edits.items()
+    }
+    if not bootstrap.try_set_shortcuts(desired, interactive=True):
+        _load_shortcut_fields(edits)
+
+
 class PreferencePage:
     """Edit → Preferences → NeoRibbon. Apply/OK write params and refresh live."""
 
@@ -36,7 +109,28 @@ class PreferencePage:
         import FreeCADGui as Gui
 
         self.form = Gui.PySideUic.loadUi(_ui_path())
+        self._shortcut_edits: dict[str, object] = {}
+        self._wire_shortcut_editors()
         self._set_version_label()
+
+    def _wire_shortcut_editors(self) -> None:
+        group = getattr(self.form, "groupShortcuts", None)
+        form_layout = group.layout() if group is not None else None
+        if form_layout is None:
+            form_layout = getattr(self.form, "formShortcuts", None)
+        if form_layout is None:
+            import FreeCAD as App
+
+            App.Console.PrintWarning(
+                "NeoRibbon: preference shortcut layout missing; "
+                "keyboard shortcuts cannot be edited on this page\n"
+            )
+            return
+        self._shortcut_edits = _install_shortcut_editors(
+            self.form,
+            form_layout,
+            lambda kind: _reset_shortcut_field(self._shortcut_edits, kind),
+        )
 
     def _set_version_label(self) -> None:
         label = getattr(self.form, "labelVersion", None)
@@ -51,6 +145,7 @@ class PreferencePage:
         form.comboButtonSize.setCurrentIndex(prefs.button_size_index())
         form.spinVisiblePerSection.setValue(prefs.visible_per_section())
         form.lineIgnoredToolbars.setText(prefs.ignored_toolbars_text())
+        _load_shortcut_fields(self._shortcut_edits)
         self._set_version_label()
 
     def saveSettings(self) -> None:  # noqa: N802 — FreeCAD preference page API
@@ -63,6 +158,7 @@ class PreferencePage:
             prefs.set_button_size(prefs.BUTTON_SIZES[idx])
         prefs.set_visible_per_section(form.spinVisiblePerSection.value())
         prefs.set_ignored_toolbars_text(form.lineIgnoredToolbars.text())
+        _save_shortcut_fields(self._shortcut_edits)
         from freecad.NeoRibbon import bootstrap
 
         bootstrap.apply_prefs()
@@ -73,7 +169,7 @@ class PreferencesDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("NeoRibbon")
         self.setModal(True)
-        self.resize(440, 280)
+        self.resize(480, 440)
 
         self.enabled = QCheckBox("Enable ribbon")
         self.promote_large = QCheckBox("Large icon for first command in each section")
@@ -101,12 +197,25 @@ class PreferencesDialog(QDialog):
         form.addRow("Visible commands / section", self.visible_count)
         form.addRow("Ignored toolbars", self.ignored)
 
+        shortcut_box = QGroupBox("Keyboard shortcuts")
+        shortcut_form = QFormLayout(shortcut_box)
+        self._shortcut_edits = _install_shortcut_editors(
+            self,
+            shortcut_form,
+            lambda kind: _reset_shortcut_field(self._shortcut_edits, kind),
+        )
+        shortcut_hint = QLabel(
+            "Click a field, then press keys. Reset restores the default. "
+            "A shortcut already used elsewhere is rejected immediately."
+        )
+        shortcut_hint.setWordWrap(True)
+
         hint = QLabel(
             "Each section shows your most-used commands; extras are under More. "
             "Hide sections with × on the section title, Sections ▾, or "
             "the checkboxes in Reorder sections…. "
             "Reorder groups from Sections ▾ → Reorder sections…. "
-            "Ctrl+Shift+R restores classic toolbars if needed."
+            "Restore classic toolbars uses the shortcut below (default Ctrl+Shift+R)."
         )
         hint.setWordWrap(True)
 
@@ -122,6 +231,8 @@ class PreferencesDialog(QDialog):
 
         root = QVBoxLayout(self)
         root.addLayout(form)
+        root.addWidget(shortcut_box)
+        root.addWidget(shortcut_hint)
         root.addWidget(hint)
         root.addWidget(version)
         root.addWidget(buttons)
@@ -139,6 +250,7 @@ class PreferencesDialog(QDialog):
         self.button_size.setCurrentIndex(max(0, index))
         self.visible_count.setValue(prefs.visible_per_section())
         self.ignored.setText(prefs.ignored_toolbars_text())
+        _load_shortcut_fields(self._shortcut_edits)
 
     def apply(self) -> None:
         prefs.set_enabled(self.enabled.isChecked())
@@ -150,6 +262,7 @@ class PreferencesDialog(QDialog):
         prefs.set_button_size(str(size))
         prefs.set_visible_per_section(self.visible_count.value())
         prefs.set_ignored_toolbars_text(self.ignored.text())
+        _save_shortcut_fields(self._shortcut_edits)
 
 
 def open_preferences_dialog() -> None:

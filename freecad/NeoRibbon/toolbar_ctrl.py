@@ -25,6 +25,9 @@ class ToolbarController(QObject):
         self._enabled = False
         self._hidden_names: set[str] = set()
         self._hidden_anon: set[int] = set()
+        self._user_hidden_names: set[str] = set()
+        self._user_hidden_anon: set[int] = set()
+        self._snapshot_done = False
         self._filtering = False
         self._mw: QMainWindow | None = None
         self._hide_timers: list = []
@@ -43,6 +46,9 @@ class ToolbarController(QObject):
                 pass
         self._mw = mw
         mw.installEventFilter(self)
+        if not self._snapshot_done:
+            self._snapshot_user_hidden()
+            self._snapshot_done = True
         self.hide_classic()
 
     def disable_guard(self) -> None:
@@ -73,16 +79,54 @@ class ToolbarController(QObject):
             return True
         return False
 
+    def _snapshot_user_hidden(self) -> None:
+        """Record toolbars the user already hid before NeoRibbon took over."""
+        mw = self._main_window()
+        if mw is None:
+            return
+        for toolbar in mw.findChildren(QToolBar):
+            if self._should_skip(toolbar) or toolbar.isVisible():
+                continue
+            name = toolbar.objectName() or ""
+            if name:
+                self._user_hidden_names.add(name)
+            else:
+                self._user_hidden_anon.add(id(toolbar))
+
+    def _is_user_hidden(self, toolbar: QToolBar) -> bool:
+        name = toolbar.objectName() or ""
+        if name:
+            return name in self._user_hidden_names
+        return id(toolbar) in self._user_hidden_anon
+
+    def _is_hidden_by_us(self, toolbar: QToolBar) -> bool:
+        name = toolbar.objectName() or ""
+        if name:
+            return name in self._hidden_names
+        return id(toolbar) in self._hidden_anon
+
     def _track_and_hide(self, toolbar: QToolBar) -> None:
         if self._should_skip(toolbar):
+            return
+        if self._is_user_hidden(toolbar):
+            return
+        if self._is_hidden_by_us(toolbar):
+            if toolbar.isVisible():
+                toolbar.hide()
+            return
+        if not toolbar.isVisible():
+            name = toolbar.objectName() or ""
+            if name:
+                self._user_hidden_names.add(name)
+            else:
+                self._user_hidden_anon.add(id(toolbar))
             return
         name = toolbar.objectName() or ""
         if name:
             self._hidden_names.add(name)
         else:
             self._hidden_anon.add(id(toolbar))
-        if toolbar.isVisible():
-            toolbar.hide()
+        toolbar.hide()
 
     def hide_classic(self) -> None:
         if not self._enabled:
@@ -191,6 +235,7 @@ class ToolbarController(QObject):
             pass
 
     def _show_classic_toolbars(self) -> int:
+        """Show only toolbars NeoRibbon hid. Never un-hide user-hidden bars."""
         mw = self._main_window()
         if mw is None:
             return 0
@@ -199,6 +244,10 @@ class ToolbarController(QObject):
             name = toolbar.objectName() or ""
             if name.startswith("NeoRibbon"):
                 continue
+            if self._is_user_hidden(toolbar):
+                continue
+            if not self._is_hidden_by_us(toolbar):
+                continue
             try:
                 toolbar.show()
                 shown += 1
@@ -206,15 +255,18 @@ class ToolbarController(QObject):
                 pass
         self._hidden_names.clear()
         self._hidden_anon.clear()
+        self._user_hidden_names.clear()
+        self._user_hidden_anon.clear()
+        self._snapshot_done = False
         return shown
 
     def restore(self) -> None:
-        """Show toolbars we hid, then fall back to every classic toolbar."""
+        """Show classic toolbars this session hid; leave user-hidden bars hidden."""
         self.disable_guard()
         self.restore_all_toolbars()
 
     def restore_all_toolbars(self, *, touch_menubar: bool = True) -> None:
-        """Show every non-NeoRibbon toolbar (+ menu bar unless shutting down)."""
+        """Restore bars NeoRibbon hid. Does not force-show user-hidden toolbars."""
         self.disable_guard()
         shown = self._show_classic_toolbars()
         if touch_menubar:

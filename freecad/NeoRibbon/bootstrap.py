@@ -10,11 +10,15 @@ import FreeCAD as App
 import FreeCADGui as Gui
 from PySide.QtCore import QFileSystemWatcher, QTimer, Qt
 from PySide.QtGui import QKeySequence, QShortcut
-from PySide.QtWidgets import QMainWindow, QToolBar
+from PySide.QtWidgets import QMainWindow, QMessageBox, QToolBar
 
 from freecad.NeoRibbon import prefs
 from freecad.NeoRibbon.commands import register as register_commands
 from freecad.NeoRibbon.ribbon_bar import RibbonDock
+from freecad.NeoRibbon.shortcut_conflicts import (
+    find_shortcut_conflicts,
+    normalize_shortcut,
+)
 from freecad.NeoRibbon.toolbar_ctrl import ToolbarController
 
 _controller: Optional[ToolbarController] = None
@@ -177,7 +181,7 @@ def _hide_ribbon(restore_toolbars: bool = True) -> None:
     if restore_toolbars:
         if _controller is None:
             _controller = ToolbarController()
-        # restore_all: do not rely on the hide-tracking set (timers / late bars).
+        # Only bars this session hid — never force-show user-hidden toolbars.
         _controller.restore_all_toolbars()
 
 
@@ -218,39 +222,205 @@ def restore_toolbars() -> None:
     )
 
 
+def _open_preferences() -> None:
+    from freecad.NeoRibbon.prefs_dialog import open_preferences_dialog
+
+    open_preferences_dialog()
+
+
+_SHORTCUT_SLOTS = {
+    "toggle": toggle,
+    "restore": restore_toolbars,
+    "prefs": _open_preferences,
+}
+
+
+def _resolved_shortcut(kind: str, value: str | None = None) -> str:
+    raw = prefs.shortcut(kind) if value is None else (value or "").strip()
+    if not raw:
+        raw = prefs.shortcut_default(kind)
+    return normalize_shortcut(raw) or prefs.shortcut_default(kind)
+
+
+def _clear_escape_shortcuts() -> None:
+    """Drop NeoRibbon QShortcuts so they can be rebound from prefs."""
+    global _escape_shortcuts
+    mw = _main_window()
+    victims = list(_escape_shortcuts)
+    try:
+        for sc in mw.findChildren(QShortcut):
+            name = sc.objectName() or ""
+            if name.startswith("NeoRibbon_shortcut_"):
+                victims.append(sc)
+    except Exception:
+        pass
+    seen: set[int] = set()
+    for shortcut in victims:
+        ident = id(shortcut)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        try:
+            shortcut.setEnabled(False)
+            shortcut.setKey(QKeySequence())
+            shortcut.setObjectName("")
+            shortcut.setParent(None)
+            shortcut.deleteLater()
+        except Exception:
+            pass
+    _escape_shortcuts = []
+
+
+def _bind_shortcut(kind: str, seq: str) -> bool:
+    global _escape_shortcuts
+    mw = _main_window()
+    label = prefs.SHORTCUT_LABELS[kind]
+    try:
+        shortcut = QShortcut(QKeySequence(seq), mw)
+        shortcut.setObjectName(prefs.SHORTCUT_OBJECT_NAMES[kind])
+        shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        shortcut.setAutoRepeat(False)
+        shortcut.activated.connect(_SHORTCUT_SLOTS[kind])
+        _escape_shortcuts.append(shortcut)
+        App.Console.PrintLog(f"NeoRibbon: shortcut {seq} → {label}\n")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        App.Console.PrintWarning(
+            f"NeoRibbon: could not register {seq} ({label}): {exc}\n"
+        )
+        return False
+
+
+def _shortcut_problems(desired: dict[str, str]) -> list[str]:
+    """Uniqueness + foreign-binding problems for a proposed shortcut map."""
+    problems: list[str] = []
+    by_seq: dict[str, list[str]] = {}
+    for kind, seq in desired.items():
+        by_seq.setdefault(seq.casefold(), []).append(kind)
+    for _seq_key, kinds in by_seq.items():
+        if len(kinds) < 2:
+            continue
+        labels = ", ".join(prefs.SHORTCUT_LABELS[k] for k in kinds)
+        problems.append(f"{desired[kinds[0]]} is assigned to more than one action ({labels})")
+
+    mw = _main_window()
+    for kind, seq in desired.items():
+        try:
+            conflicts = find_shortcut_conflicts(mw, seq)
+        except Exception as exc:  # noqa: BLE001
+            App.Console.PrintWarning(
+                f"NeoRibbon: shortcut conflict scan failed ({exc}); "
+                "continuing\n"
+            )
+            conflicts = []
+        if conflicts:
+            detail = "; ".join(conflicts[:8])
+            if len(conflicts) > 8:
+                detail += f"; …(+{len(conflicts) - 8} more)"
+            label = prefs.SHORTCUT_LABELS[kind]
+            problems.append(f"{label} ({seq}) conflicts with {detail}")
+    return problems
+
+
+def _warn_shortcut_problems(problems: list[str], *, interactive: bool) -> None:
+    text = "; ".join(problems)
+    if interactive:
+        App.Console.PrintWarning(
+            f"NeoRibbon: shortcut not applied: {text}. "
+            "The previous NeoRibbon shortcuts were kept.\n"
+        )
+    else:
+        App.Console.PrintWarning(
+            f"NeoRibbon: shortcut conflict: {text}. "
+            "Conflicting chords were skipped (Tools menu still works). "
+            "Pick free keys under Tools → NeoRibbon preferences….\n"
+        )
+    if not interactive:
+        return
+    mw = _main_window()
+    lines = "\n".join(f"• {p}" for p in problems[:12])
+    if len(problems) > 12:
+        lines += f"\n• …and {len(problems) - 12} more"
+    try:
+        QMessageBox.warning(
+            mw,
+            "NeoRibbon",
+            (
+                "Cannot apply keyboard shortcuts.\n\n"
+                f"{lines}\n\n"
+                "The previous NeoRibbon shortcuts were kept."
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        App.Console.PrintWarning(
+            f"NeoRibbon: could not show shortcut conflict dialog: {exc}\n"
+        )
+
+
+def try_set_shortcuts(
+    values: dict[str, str] | None = None,
+    *,
+    interactive: bool = False,
+    persist: bool = True,
+) -> bool:
+    """Validate, optionally persist, and apply NeoRibbon shortcuts.
+
+    Returns False on conflict when *interactive* (previous bindings kept).
+    At startup, conflicting chords are skipped rather than stolen.
+    """
+    desired: dict[str, str] = {}
+    for kind in prefs.SHORTCUT_KINDS:
+        raw = None if values is None else values.get(kind)
+        desired[kind] = _resolved_shortcut(kind, raw)
+
+    problems = _shortcut_problems(desired)
+    if problems and interactive:
+        _warn_shortcut_problems(problems, interactive=True)
+        return False
+
+    skip: set[str] = set()
+    if problems:
+        _warn_shortcut_problems(problems, interactive=False)
+        by_seq: dict[str, list[str]] = {}
+        for kind, seq in desired.items():
+            by_seq.setdefault(seq.casefold(), []).append(kind)
+        for kinds in by_seq.values():
+            if len(kinds) > 1:
+                skip.update(kinds)
+        mw = _main_window()
+        for kind, seq in desired.items():
+            if kind in skip:
+                continue
+            if find_shortcut_conflicts(mw, seq):
+                skip.add(kind)
+
+    if persist and not skip:
+        for kind, seq in desired.items():
+            prefs.set_shortcut(kind, seq)
+
+    _clear_escape_shortcuts()
+    for kind, seq in desired.items():
+        if kind in skip:
+            continue
+        _bind_shortcut(kind, seq)
+    return True
+
+
+def reload_shortcuts(*, interactive: bool = False) -> bool:
+    """Re-read shortcut prefs and apply them."""
+    return try_set_shortcuts(interactive=interactive, persist=False)
+
+
 def _register_escape_shortcuts() -> None:
     """
     Application-wide shortcuts for NeoRibbon commands.
 
     FreeCAD Accel on Tools menu actions can be unreliable; QShortcut with
-    ApplicationShortcut stays available.
+    ApplicationShortcut stays available. Skip a binding when another command
+    or widget already owns the sequence. Chords come from preferences
+    (defaults: Ctrl+Shift+N / R / ,).
     """
-    global _escape_shortcuts
-    if _escape_shortcuts:
-        return
-    mw = _main_window()
-    bindings = (
-        ("Ctrl+Shift+R", restore_toolbars, "NeoRibbon restore classic UI"),
-        ("Ctrl+Shift+N", toggle, "NeoRibbon toggle"),
-        (
-            "Ctrl+Shift+,",
-            lambda: __import__(
-                "freecad.NeoRibbon.prefs_dialog", fromlist=["open_preferences_dialog"]
-            ).open_preferences_dialog(),
-            "NeoRibbon preferences",
-        ),
-    )
-    for seq, slot, label in bindings:
-        try:
-            shortcut = QShortcut(QKeySequence(seq), mw)
-            shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-            shortcut.activated.connect(slot)
-            _escape_shortcuts.append(shortcut)
-            App.Console.PrintLog(f"NeoRibbon: shortcut {seq} → {label}\n")
-        except Exception as exc:  # noqa: BLE001
-            App.Console.PrintWarning(
-                f"NeoRibbon: could not register {seq}: {exc}\n"
-            )
+    try_set_shortcuts(interactive=False, persist=False)
 
 
 def _resources_dir() -> str:

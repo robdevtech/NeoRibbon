@@ -15,6 +15,30 @@ BUTTON_SIZES = ("small", "medium", "large")
 DEFAULT_BUTTON_SIZE = "medium"
 DEFAULT_VISIBLE_PER_SECTION = 6
 
+# Application shortcuts (QShortcut). Empty stored value means use the default.
+SHORTCUT_ROWS: tuple[tuple[str, str], ...] = (
+    ("toggle", "Toggle ribbon"),
+    ("restore", "Restore classic toolbars"),
+    ("prefs", "Open preferences"),
+)
+SHORTCUT_KINDS = tuple(kind for kind, _label in SHORTCUT_ROWS)
+SHORTCUT_LABELS = {kind: label for kind, label in SHORTCUT_ROWS}
+SHORTCUT_DEFAULTS = {
+    "toggle": "Ctrl+Shift+N",
+    "restore": "Ctrl+Shift+R",
+    "prefs": "Ctrl+Shift+,",
+}
+SHORTCUT_PARAMS = {
+    "toggle": "ShortcutToggle",
+    "restore": "ShortcutRestore",
+    "prefs": "ShortcutPrefs",
+}
+SHORTCUT_OBJECT_NAMES = {
+    "toggle": "NeoRibbon_shortcut_toggle",
+    "restore": "NeoRibbon_shortcut_restore",
+    "prefs": "NeoRibbon_shortcut_prefs",
+}
+
 # Keep one ParamGet wrapper alive. ParameterGrpPy::~ParameterGrpPy Detach()es
 # observers, so Attach() on a temporary App.ParamGet(...) is a no-op after GC.
 _group_handle = None
@@ -216,6 +240,26 @@ def ignored_toolbars_text() -> str:
 
 def set_ignored_toolbars_text(text: str) -> None:
     set_ignored_toolbars(text.split(";"))
+
+
+def shortcut_default(kind: str) -> str:
+    return SHORTCUT_DEFAULTS[kind]
+
+
+def shortcut(kind: str) -> str:
+    """Resolved shortcut for *kind* (stored text, or default if empty)."""
+    key = SHORTCUT_PARAMS[kind]
+    text = _group().GetString(key, "").strip()
+    return text or SHORTCUT_DEFAULTS[kind]
+
+
+def set_shortcut(kind: str, value: str) -> None:
+    text = (value or "").strip() or SHORTCUT_DEFAULTS[kind]
+    _group().SetString(SHORTCUT_PARAMS[kind], text)
+
+
+def shortcut_map() -> dict[str, str]:
+    return {kind: shortcut(kind) for kind in SHORTCUT_KINDS}
 
 
 def hidden_sections() -> frozenset[str]:

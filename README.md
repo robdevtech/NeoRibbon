@@ -22,9 +22,9 @@ This is reversible at any time:
 
 | Goal | Action | Restart? |
 |------|--------|----------|
-| Turn NeoRibbon off (keep addon loaded) | **Tools → Toggle NeoRibbon** / **Ctrl+Shift+N**, or uncheck **Enable ribbon** in Preferences then **Apply** | **No** — classic toolbars and the menu bar come back immediately |
-| Force classic toolbars back | **Tools → Restore classic toolbars** or **Ctrl+Shift+R** | No |
-| Preferences (size, labels, …) | **Edit → Preferences → NeoRibbon**, **Tools → NeoRibbon preferences…**, or **Ctrl+Shift+,** | No — Apply/OK takes effect immediately |
+| Turn NeoRibbon off (keep addon loaded) | **Tools → Toggle NeoRibbon** / toggle shortcut (default **Ctrl+Shift+N**), or uncheck **Enable ribbon** in Preferences then **Apply** | **No** — classic toolbars and the menu bar come back immediately |
+| Force classic toolbars back | **Tools → Restore classic toolbars** or restore shortcut (default **Ctrl+Shift+R**) | No |
+| Preferences (size, labels, shortcuts, …) | **Edit → Preferences → NeoRibbon**, **Tools → NeoRibbon preferences…**, or preferences shortcut (default **Ctrl+Shift+,**) | No — Apply/OK takes effect immediately |
 | Disable or uninstall via **Addon Manager** | AM writes `ADDON_DISABLED` (or deletes the Mod). NeoRibbon restores classic toolbars in the current session | **Yes** — FreeCAD only unloads/loads Mods at startup. First install and AM Enable also need a restart |
 
 NeoRibbon does not phone home or send telemetry. Preferences and usage counts stay in FreeCAD’s local parameter store (`User parameter:BaseApp/Preferences/Mod/NeoRibbon`).
@@ -73,11 +73,11 @@ After this addon is accepted into the official Addon Index, it will also appear 
 
 | Action | How |
 |--------|-----|
-| Toggle ribbon | **Tools → Toggle NeoRibbon** / **Ctrl+Shift+N** (`NeoRibbon_Toggle`) |
+| Toggle ribbon | **Tools → Toggle NeoRibbon** (`NeoRibbon_Toggle`; default **Ctrl+Shift+N**) |
 | Toggle large section icon | **Tools → Toggle large section icon** (`NeoRibbon_ToggleLargeIcon`) |
 | Toggle button text labels | **Tools → Toggle button text labels** (`NeoRibbon_ToggleButtonLabels`) |
-| Preferences | **Tools → NeoRibbon preferences…** / **Ctrl+Shift+,** or **Edit → Preferences → NeoRibbon** |
-| Emergency toolbar restore | **Tools → Restore classic toolbars** / **Ctrl+Shift+R** (`NeoRibbon_RestoreToolbars`) |
+| Preferences | **Tools → NeoRibbon preferences…** (`NeoRibbon_Preferences`; default **Ctrl+Shift+,**) or **Edit → Preferences → NeoRibbon** |
+| Emergency toolbar restore | **Tools → Restore classic toolbars** (`NeoRibbon_RestoreToolbars`; default **Ctrl+Shift+R**) |
 
 Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 
@@ -88,6 +88,7 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 - **Button size** — `small` \| `medium` \| `large`
 - **Visible commands / section** — most-used commands shown as buttons (default 6); the rest are under **More ▾**
 - **Ignored toolbars** — semicolon-separated FreeCAD toolbar names to skip permanently
+- **Keyboard shortcuts** — click a field and press keys (or **Reset**) for toggle, restore classic toolbars, and open preferences. Defaults: `Ctrl+Shift+N`, `Ctrl+Shift+R`, `Ctrl+Shift+,`. Empty stored value uses the default. A chord already used by FreeCAD — or by another NeoRibbon shortcut in the same form — is rejected immediately; the previous binding is kept.
 - **Section order** — per-workbench group order under `SectionOrder/<workbench>` (semicolon-separated names); new toolbars append after the saved list
 
 **Sections:** click the section footer (except **×**) for a full labeled command list (with shortcuts in parentheses when set); use the **pin** on each row to keep that command in the focus strip. The list stays on-screen if the group is scrolled off the edge. **×** hides the section; **Sections ▾** shows/hides groups and has **Reorder sections…** (checkbox to show/hide; drag or move up/down for order; per workbench). Hidden groups stay in that list so you can turn them back on. **Reset section order** restores the workbench toolbar order.
@@ -126,7 +127,7 @@ NeoRibbon/
 
 1. Install Mod → ribbon appears; classic toolbars are hidden.
 2. Switch Part / PartDesign / Draft → ribbon panels update without a long delay.
-3. Toggle NeoRibbon off, or uncheck **Enable ribbon** then **Apply** → classic toolbars return immediately.
+3. Toggle NeoRibbon off, or uncheck **Enable ribbon** then **Apply** → classic toolbars NeoRibbon hid return; toolbars you had already hidden stay hidden.
 4. Set an ignored toolbar name → that tab is omitted after refresh.
 5. Change button size → buttons update on next refresh.
 6. Report View shows no cascade of swallowed exceptions from NeoRibbon.
@@ -134,6 +135,7 @@ NeoRibbon/
 8. Toggle a checkable command (e.g. Draft snap, Sketcher helper) — ribbon button stays sunken while on.
 9. Scroll the ribbon so a group is near the left/right edge, open its ▾ list — popup stays fully on screen.
 10. **Edit → Preferences → NeoRibbon** shows **NeoRibbon x.y.z** at the bottom; Apply/OK updates the live ribbon.
+11. If a NeoRibbon shortcut is already bound elsewhere, Report View warns and that key is not stolen (Tools menu still works). Change chords under **Edit → Preferences → NeoRibbon** or **Tools → NeoRibbon preferences…**; a used chord is rejected as soon as you press it.
 
 A short automated GUI probe is in [`scripts/smoke_gui.py`](scripts/smoke_gui.py):
 

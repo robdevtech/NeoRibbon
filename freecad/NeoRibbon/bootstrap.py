@@ -40,6 +40,7 @@ _PREF_PAGE_KEYS = frozenset(
         "ShowButtonLabels",
         "ButtonSize",
         "VisiblePerSection",
+        "ChildCommandMode",
         "IgnoredToolbars",
     }
 )

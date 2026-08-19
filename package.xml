@@ -8,9 +8,9 @@
 
   <description>Lightweight ribbon UI for FreeCAD 1.1+. Maps the active workbench toolbars into a compact top ribbon, hides classic toolbars while enabled, and restores them on disable. No external Python dependencies.</description>
 
-  <version>0.3.5</version>
+  <version>0.3.6</version>
 
-  <date>2026-08-17</date>
+  <date>2026-08-19</date>
 
   <maintainer email="therobdev@pm.me">Rob</maintainer>
 

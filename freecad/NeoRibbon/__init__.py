@@ -3,4 +3,4 @@
 
 from freecad.NeoRibbon.prefs import addon_version
 
-__version__ = addon_version() or "0.3.5"
+__version__ = addon_version() or "0.3.6"

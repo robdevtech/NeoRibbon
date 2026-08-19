@@ -15,17 +15,31 @@ def _group():
     return App.ParamGet(_USAGE_PATH)
 
 
+def _usage_key(command_name: str) -> str:
+    # Param entry names should stay simple.
+    return (command_name or "").replace("/", "_").replace(":", "_")[:200]
+
+
 def usage_count(command_name: str) -> int:
-    if not command_name:
+    key = _usage_key(command_name)
+    if not key:
         return 0
-    return int(_group().GetInt(command_name, 0))
+    return int(_group().GetInt(key, 0))
 
 
 def record_use(command_name: str) -> None:
-    if not command_name:
+    key = _usage_key(command_name)
+    if not key:
         return
     group = _group()
-    group.SetInt(command_name, group.GetInt(command_name, 0) + 1)
+    group.SetInt(key, group.GetInt(key, 0) + 1)
+
+
+def _command_ident(cmd) -> str:
+    ident = getattr(cmd, "ident", None)
+    if callable(ident):
+        return str(ident() or "")
+    return str(getattr(cmd, "name", "") or "")
 
 
 def named_commands(commands: list) -> list:
@@ -52,7 +66,7 @@ def rank_commands(commands: list) -> list:
     named.sort(
         key=lambda item: (
             0 if item[1].name in PRIORITY_COMMANDS else 1,
-            -usage_count(item[1].name),
+            -usage_count(_command_ident(item[1])),
             item[0],
         )
     )
@@ -67,21 +81,22 @@ def focus_commands(section: str, commands: list, limit: int) -> list:
     up to ``limit`` are filled from usage ranking.
     """
     named = named_commands(commands)
-    by_name = {cmd.name: cmd for cmd in named}
-    pinned_names = [n for n in prefs.pinned_commands(section) if n in by_name]
+    by_id = {_command_ident(cmd): cmd for cmd in named}
+    pinned_names = [n for n in prefs.pinned_commands(section) if n in by_id]
 
     focus: list = []
     seen: set[str] = set()
     for name in pinned_names:
-        focus.append(by_name[name])
+        focus.append(by_id[name])
         seen.add(name)
 
     target = max(int(limit), len(pinned_names))
     for cmd in rank_commands(named):
         if len(focus) >= target:
             break
-        if cmd.name in seen:
+        ident = _command_ident(cmd)
+        if ident in seen:
             continue
         focus.append(cmd)
-        seen.add(cmd.name)
+        seen.add(ident)
     return focus

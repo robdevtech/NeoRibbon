@@ -10,7 +10,7 @@ from typing import Callable, Optional
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer
-from PySide.QtGui import QFont, QGuiApplication, QIcon
+from PySide.QtGui import QFont, QGuiApplication, QIcon, QKeySequence
 from PySide.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -123,11 +123,12 @@ def _file_icon(name: str) -> QIcon:
     return QIcon(path) if os.path.isfile(path) else QIcon()
 
 
-def _icon_for(command: RibbonCommand, action_index: int = 0) -> QIcon:
+def _icon_for(command: RibbonCommand, action_index: int | None = None) -> QIcon:
     # Prefer the live QAction icon. Sketcher construction mode (and similar)
     # swaps action.icon() while Gui.getIcon(pixmap) stays on the static normal
     # artwork — same source classic toolbars use via QToolButton.defaultAction().
-    action_icon = command_action_icon(command.name, action_index)
+    index = command.action_index if action_index is None else action_index
+    action_icon = command_action_icon(command.name, index)
     if action_icon is not None:
         return action_icon
     if command.pixmap:
@@ -163,10 +164,10 @@ def _trigger_checkable_action(action) -> bool:
         return False
 
 
-def _run_command(name: str, index: int = 0) -> None:
+def _run_command(name: str, index: int = 0, *, usage_key: str | None = None) -> None:
     if not name:
         return
-    usage.record_use(name)
+    usage.record_use(usage_key or name)
     actions = command_qactions(name)
     if 0 <= index < len(actions) and _trigger_checkable_action(actions[index]):
         return
@@ -205,6 +206,87 @@ def _command_shortcut(command_name: str) -> str:
         return str(info.get("shortcut") or "").strip()
     except Exception:
         return ""
+
+
+def _qaction_shortcut_text(action) -> str:
+    if action is None:
+        return ""
+    try:
+        seq = action.shortcut()
+    except Exception:
+        return ""
+    if seq is None:
+        return ""
+    try:
+        if hasattr(seq, "isEmpty") and seq.isEmpty():
+            return ""
+        text = seq.toString() if hasattr(seq, "toString") else str(seq)
+        return str(text).strip()
+    except Exception:
+        return ""
+
+
+def _command_button_shortcut(command: RibbonCommand) -> str:
+    actions = command_qactions(command.name)
+    index = command.action_index
+    if 0 <= index < len(actions):
+        text = _qaction_shortcut_text(actions[index])
+        if text:
+            return text
+    if index == 0:
+        return _command_shortcut(command.name)
+    return ""
+
+
+def _copy_action_shortcut(dst, src) -> None:
+    """Show the child's shortcut in our menu without stealing the global chord."""
+    if dst is None or src is None:
+        return
+    try:
+        seq = src.shortcut()
+    except Exception:
+        return
+    if seq is None:
+        return
+    try:
+        if hasattr(seq, "isEmpty") and seq.isEmpty():
+            return
+    except Exception:
+        pass
+    try:
+        dst.setShortcut(QKeySequence(seq) if not isinstance(seq, QKeySequence) else seq)
+        dst.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
+    except Exception:
+        pass
+
+
+def _fill_compound_menu(
+    menu: QMenu,
+    command: RibbonCommand,
+    *,
+    after=None,
+) -> None:
+    """Clone compound-command children so classic toolbar QActions stay put."""
+    qactions = command_qactions(command.name)
+    for index, text, tip in command_actions_meta(command.name):
+        item = menu.addAction(_icon_for(command, index), text)
+        if tip:
+            item.setToolTip(tip)
+        src = qactions[index] if index < len(qactions) else None
+        if src is not None:
+            try:
+                if src.isCheckable():
+                    item.setCheckable(True)
+                    item.setChecked(bool(src.isChecked()))
+            except Exception:
+                pass
+            _copy_action_shortcut(item, src)
+        item.triggered.connect(
+            lambda _c=False, n=command.name, i=index, cb=after: (
+                _run_command(n, i),
+                cb() if cb else None,
+            )
+        )
 
 
 def _workbench_icon(icon_name: str) -> QIcon:
@@ -368,10 +450,12 @@ class _ActionButtonSync(_ActionStateWatch):
         action,
         command_name: str,
         action_index: int = 0,
+        usage_key: str | None = None,
     ) -> None:
         super().__init__(button, action)
         self._name = command_name
         self._index = action_index
+        self._usage_key = usage_key or command_name
         button.clicked.connect(self._on_clicked)
 
     def _on_clicked(self, _checked: bool = False) -> None:
@@ -379,24 +463,13 @@ class _ActionButtonSync(_ActionStateWatch):
         # Prefer QAction.trigger() so checkable commands (Snap Lock) update like
         # the shortcut. Do not also runCommand — that can skip or fight the action.
         if _trigger_checkable_action(self._action):
-            usage.record_use(self._name)
+            usage.record_use(self._usage_key)
         else:
-            _run_command(self._name, self._index)
+            _run_command(self._name, self._index, usage_key=self._usage_key)
         _sync_toggle_button(self._button, self._action)
         QTimer.singleShot(
             0, lambda: _sync_toggle_button(self._button, self._action)
         )
-
-
-class _UsageRecorder(QObject):
-    """Record command use when a live QAction is triggered; dies with parent."""
-
-    def __init__(self, command_name: str, parent: QObject) -> None:
-        super().__init__(parent)
-        self._name = command_name
-
-    def record(self, _checked: bool = False) -> None:
-        usage.record_use(self._name)
 
 
 def _bind_toggle_button(
@@ -406,7 +479,7 @@ def _bind_toggle_button(
     action_index: int = 0,
 ) -> None:
     """Make *button* checkable and keep it aligned with *action*."""
-    _ActionButtonSync(button, action, command.name, action_index)
+    _ActionButtonSync(button, action, command.name, action_index, command.ident())
 
 
 def _wire_command_button(
@@ -414,44 +487,38 @@ def _wire_command_button(
     command: RibbonCommand,
     *,
     allow_menu: bool = True,
+    on_run=None,
 ) -> None:
     """Single-action click, toggle sync, or menu for FreeCAD compound commands."""
     actions_meta = command_actions_meta(command.name)
     qactions = command_qactions(command.name)
+    action_index = command.action_index
     compound = (
-        allow_menu and command.action_count > 1 and len(actions_meta) > 1
+        allow_menu
+        and prefs.nest_command_children()
+        and action_index == 0
+        and len(actions_meta) > 1
     )
 
     if compound:
         button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         menu = QMenu(button)
         theme.apply_menu_theme(menu)
-        recorder = _UsageRecorder(command.name, button)
-        for index, text, tip in actions_meta:
-            qaction = qactions[index] if index < len(qactions) else None
-            if qaction is not None:
-                menu.addAction(qaction)
-                try:
-                    qaction.triggered.connect(recorder.record)
-                except Exception:
-                    pass
-            else:
-                item = menu.addAction(_icon_for(command, index), text)
-                item.setToolTip(tip)
-                item.triggered.connect(
-                    lambda _c=False, n=command.name, i=index: _run_command(n, i)
-                )
+        _fill_compound_menu(menu, command, after=on_run)
         button.setMenu(menu)
 
-    toggle = command_checkable_action(command.name, 0)
+    toggle = command_checkable_action(command.name, action_index)
     if toggle is not None:
-        _bind_toggle_button(button, command, toggle, 0)
+        _bind_toggle_button(button, command, toggle, action_index)
         return
     # Non-checkable commands (e.g. Sketcher geometry) still swap icons live.
-    if qactions:
-        _ActionStateWatch(button, qactions[0])
+    if 0 <= action_index < len(qactions):
+        _ActionStateWatch(button, qactions[action_index])
     button.clicked.connect(
-        lambda _c=False, n=command.name: _run_command(n, 0)
+        lambda _c=False, n=command.name, i=action_index, k=command.ident(): (
+            _run_command(n, i, usage_key=k),
+            on_run() if on_run else None,
+        )
     )
 
 
@@ -794,16 +861,16 @@ class SectionListPopup(QFrame):
         pin_order = prefs.pinned_commands(section)
         pin_set = set(pin_order)
         original_index = {
-            cmd.name: index
+            cmd.ident(): index
             for index, cmd in enumerate(commands)
             if getattr(cmd, "name", "")
         }
         ordered = usage.named_commands(commands)
         ordered.sort(
             key=lambda cmd: (
-                0 if cmd.name in pin_set else 1,
-                pin_order.index(cmd.name) if cmd.name in pin_set else 10_000,
-                original_index.get(cmd.name, 10_000),
+                0 if cmd.ident() in pin_set else 1,
+                pin_order.index(cmd.ident()) if cmd.ident() in pin_set else 10_000,
+                original_index.get(cmd.ident(), 10_000),
             )
         )
 
@@ -812,7 +879,7 @@ class SectionListPopup(QFrame):
             item.setSizeHint(QSize(300, 28))
             self._list.addItem(item)
             self._list.setItemWidget(
-                item, self._row_widget(command, command.name in pin_set)
+                item, self._row_widget(command, command.ident() in pin_set)
             )
 
         rows = min(12, max(4, self._list.count()))
@@ -835,12 +902,12 @@ class SectionListPopup(QFrame):
         pin_btn.setFixedSize(22, 22)
         pin_btn.setToolTip("Unpin from focus" if pinned else "Pin to focus strip")
         pin_btn.toggled.connect(
-            lambda checked, n=command.name, b=pin_btn: self._toggle_pin(n, checked, b)
+            lambda checked, n=command.ident(), b=pin_btn: self._toggle_pin(n, checked, b)
         )
         layout.addWidget(pin_btn)
 
         run_btn = QToolButton()
-        run_btn.setObjectName(f"NeoRibbon_list_btn_{command.name}")
+        run_btn.setObjectName(f"NeoRibbon_list_btn_{command.ident()}")
         run_btn.setAutoRaise(True)
         run_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         run_btn.setIcon(_icon_for(command))
@@ -848,8 +915,8 @@ class SectionListPopup(QFrame):
         # Section dropdowns always keep text labels.
         run_btn.setText(command.text or command.name)
         tip = command.tooltip or command.text or command.name
-        count = usage.usage_count(command.name)
-        shortcut = _command_shortcut(command.name)
+        count = usage.usage_count(command.ident())
+        shortcut = _command_button_shortcut(command)
         if shortcut:
             tip = f"{tip}  ·  {shortcut}"
         if count:
@@ -860,10 +927,7 @@ class SectionListPopup(QFrame):
         run_btn.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
-        qactions = command_qactions(command.name)
-        if qactions:
-            _ActionStateWatch(run_btn, qactions[0])
-        run_btn.clicked.connect(lambda _c=False, n=command.name: self._activate(n))
+        _wire_command_button(run_btn, command, on_run=self.close)
         layout.addWidget(run_btn, 1)
 
         if shortcut:
@@ -1102,22 +1166,22 @@ class RibbonGroup(QWidget):
         style = self._style
         show_labels = prefs.show_button_labels()
         button = QToolButton()
-        button.setObjectName(f"NeoRibbon_btn_{command.name}")
+        button.setObjectName(f"NeoRibbon_btn_{command.ident()}")
         button.setAutoRaise(True)
         button.setIcon(_icon_for(command))
         button.setIconSize(style.large_icon)
         tip = command.tooltip or command.text or command.name
-        count = usage.usage_count(command.name)
+        count = usage.usage_count(command.ident())
         if count:
             tip = f"{tip}  ·  used {count}×"
-        if prefs.is_pinned(self._panel_name, command.name):
+        if prefs.is_pinned(self._panel_name, command.ident()):
             tip = f"{tip}  ·  pinned"
         button.setToolTip(tip)
         button.setFixedHeight(style.content_height - 4)
         if show_labels:
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
             label = _short_label(command.text or command.name, style.label_chars + 1)
-            if prefs.is_pinned(self._panel_name, command.name):
+            if prefs.is_pinned(self._panel_name, command.ident()):
                 label = "• " + label
             button.setText(label)
             button.setMinimumWidth(style.large_btn_min_width)
@@ -1134,13 +1198,13 @@ class RibbonGroup(QWidget):
         style = self._style
         show_labels = prefs.show_button_labels()
         button = QToolButton()
-        button.setObjectName(f"NeoRibbon_btn_{command.name}")
+        button.setObjectName(f"NeoRibbon_btn_{command.ident()}")
         button.setAutoRaise(True)
         button.setIcon(_icon_for(command))
         button.setIconSize(style.small_icon)
         tip = command.tooltip or command.text or command.name
-        count = usage.usage_count(command.name)
-        pinned = prefs.is_pinned(self._panel_name, command.name)
+        count = usage.usage_count(command.ident())
+        pinned = prefs.is_pinned(self._panel_name, command.ident())
         if count:
             tip = f"{tip}  ·  used {count}×"
         if pinned:
@@ -1328,12 +1392,13 @@ class RibbonBar(QWidget):
         density = style.name
         promote = prefs.promote_large()
         show_labels = prefs.show_button_labels()
+        child_mode = prefs.child_command_mode()
         hidden = prefs.hidden_sections()
         limit = prefs.visible_per_section()
         pins = prefs.pins_signature()
         focus_sig = tuple(
             tuple(
-                cmd.name
+                cmd.ident()
                 for cmd in usage.focus_commands(
                     panel.name, list(panel.commands), limit
                 )
@@ -1345,13 +1410,14 @@ class RibbonBar(QWidget):
             density,
             promote,
             show_labels,
+            child_mode,
             limit,
             tuple(sorted(hidden)),
             pins,
             focus_sig,
             active_workbench_name(),
             tuple(
-                (panel.name, tuple(cmd.name for cmd in panel.commands))
+                (panel.name, tuple(cmd.ident() for cmd in panel.commands))
                 for panel in panels
             ),
             tuple(prefs.section_order(active_workbench_name())),

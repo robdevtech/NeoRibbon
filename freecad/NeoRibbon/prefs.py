@@ -15,6 +15,12 @@ PARAM_PATH = "User parameter:BaseApp/Preferences/Mod/NeoRibbon"
 BUTTON_SIZES = ("small", "medium", "large")
 DEFAULT_BUTTON_SIZE = "medium"
 DEFAULT_VISIBLE_PER_SECTION = 6
+CHILD_COMMAND_MODES = ("nested", "flat")
+CHILD_COMMAND_LABELS = (
+    "Nested in dropdown",
+    "Listed individually",
+)
+DEFAULT_CHILD_COMMAND_MODE = "nested"
 
 # Application shortcut (QShortcut). Empty stored value means use the default.
 SHORTCUT_ROWS: tuple[tuple[str, str], ...] = (
@@ -243,6 +249,37 @@ def visible_per_section() -> int:
 
 def set_visible_per_section(value: int) -> None:
     _group().SetInt("VisiblePerSection", max(1, min(24, int(value))))
+
+
+def child_command_mode_index() -> int:
+    """0=nested dropdown, 1=list each child as its own button."""
+    idx = int(_group().GetInt("ChildCommandMode", 0))
+    if 0 <= idx < len(CHILD_COMMAND_MODES):
+        return idx
+    return CHILD_COMMAND_MODES.index(DEFAULT_CHILD_COMMAND_MODE)
+
+
+def child_command_mode() -> str:
+    return CHILD_COMMAND_MODES[child_command_mode_index()]
+
+
+def set_child_command_mode(value: str | int) -> None:
+    if isinstance(value, int):
+        idx = value
+    else:
+        mode = str(value).strip().lower()
+        if mode in CHILD_COMMAND_MODES:
+            idx = CHILD_COMMAND_MODES.index(mode)
+        else:
+            idx = CHILD_COMMAND_MODES.index(DEFAULT_CHILD_COMMAND_MODE)
+    if not 0 <= idx < len(CHILD_COMMAND_MODES):
+        idx = CHILD_COMMAND_MODES.index(DEFAULT_CHILD_COMMAND_MODE)
+    _group().SetInt("ChildCommandMode", idx)
+
+
+def nest_command_children() -> bool:
+    """True when compound commands keep children in a dropdown (default)."""
+    return child_command_mode() == "nested"
 
 
 def ignored_toolbars() -> frozenset[str]:

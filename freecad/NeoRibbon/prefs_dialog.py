@@ -164,6 +164,9 @@ class PreferencePage:
         form.checkShowButtonLabels.setChecked(prefs.show_button_labels())
         form.comboButtonSize.setCurrentIndex(prefs.button_size_index())
         form.spinVisiblePerSection.setValue(prefs.visible_per_section())
+        combo = getattr(form, "comboChildCommandMode", None)
+        if combo is not None:
+            combo.setCurrentIndex(prefs.child_command_mode_index())
         form.lineIgnoredToolbars.setText(prefs.ignored_toolbars_text())
         _load_shortcut_fields(self._shortcut_edits)
         self._set_version_label()
@@ -177,6 +180,9 @@ class PreferencePage:
         if 0 <= idx < len(prefs.BUTTON_SIZES):
             prefs.set_button_size(prefs.BUTTON_SIZES[idx])
         prefs.set_visible_per_section(form.spinVisiblePerSection.value())
+        combo = getattr(form, "comboChildCommandMode", None)
+        if combo is not None:
+            prefs.set_child_command_mode(combo.currentIndex())
         prefs.set_ignored_toolbars_text(form.lineIgnoredToolbars.text())
         _save_shortcut_fields(self._shortcut_edits)
         from freecad.NeoRibbon import bootstrap
@@ -206,6 +212,13 @@ class PreferencesDialog(QDialog):
         self.visible_count.setToolTip(
             "Most-used commands shown per section; the rest go under More"
         )
+        self.child_mode = QComboBox()
+        for label, mode in zip(prefs.CHILD_COMMAND_LABELS, prefs.CHILD_COMMAND_MODES):
+            self.child_mode.addItem(label, mode)
+        self.child_mode.setToolTip(
+            "Compound tools such as Rectangle keep Centered/Rounded in a "
+            "dropdown, or list each child as its own ribbon button."
+        )
         self.ignored = QLineEdit()
         self.ignored.setPlaceholderText("Toolbar names separated by ;")
 
@@ -215,6 +228,7 @@ class PreferencesDialog(QDialog):
         form.addRow(self.show_labels)
         form.addRow("Button size", self.button_size)
         form.addRow("Visible commands / section", self.visible_count)
+        form.addRow("Dropdown command children", self.child_mode)
         form.addRow("Ignored toolbars", self.ignored)
 
         shortcut_box = QGroupBox("Keyboard shortcuts")
@@ -277,6 +291,8 @@ class PreferencesDialog(QDialog):
             index = self.button_size.findText(size.capitalize())
         self.button_size.setCurrentIndex(max(0, index))
         self.visible_count.setValue(prefs.visible_per_section())
+        child_index = self.child_mode.findData(prefs.child_command_mode())
+        self.child_mode.setCurrentIndex(max(0, child_index))
         self.ignored.setText(prefs.ignored_toolbars_text())
         _load_shortcut_fields(self._shortcut_edits)
 
@@ -289,6 +305,10 @@ class PreferencesDialog(QDialog):
             size = self.button_size.currentText().lower()
         prefs.set_button_size(str(size))
         prefs.set_visible_per_section(self.visible_count.value())
+        mode = self.child_mode.currentData()
+        if not mode:
+            mode = prefs.CHILD_COMMAND_MODES[max(0, self.child_mode.currentIndex())]
+        prefs.set_child_command_mode(str(mode))
         prefs.set_ignored_toolbars_text(self.ignored.text())
         _save_shortcut_fields(self._shortcut_edits)
 

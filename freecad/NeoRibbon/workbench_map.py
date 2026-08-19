@@ -19,13 +19,24 @@ _COMMAND_LABEL_FIXES = {
 
 @dataclass(frozen=True)
 class RibbonCommand:
-    """One ribbon button."""
+    """One ribbon button.
+
+    Compound FreeCAD commands (Rectangle, Arc, …) expose several QActions.
+    *action_index* selects which child to run; 0 is the default/parent.
+    """
 
     name: str
     text: str = ""
     tooltip: str = ""
     pixmap: str = ""
     action_count: int = 0
+    action_index: int = 0
+
+    def ident(self) -> str:
+        """Stable id for pins/usage. Children use ``name::index``."""
+        if self.action_index:
+            return f"{self.name}::{self.action_index}"
+        return self.name
 
 
 @dataclass(frozen=True)
@@ -101,7 +112,30 @@ def _command_meta(command_name: str) -> RibbonCommand:
         tooltip=tooltip,
         pixmap=pixmap,
         action_count=action_count,
+        action_index=0,
     )
+
+
+def expand_command(command: RibbonCommand) -> list[RibbonCommand]:
+    """One parent, or one row per child when listing children individually."""
+    if prefs.nest_command_children():
+        return [command]
+    children = command_actions_meta(command.name)
+    if len(children) <= 1:
+        return [command]
+    expanded: list[RibbonCommand] = []
+    for index, text, tip in children:
+        expanded.append(
+            RibbonCommand(
+                name=command.name,
+                text=text,
+                tooltip=tip or text,
+                pixmap=command.pixmap,
+                action_count=1,
+                action_index=index,
+            )
+        )
+    return expanded
 
 
 def command_action_icon(command_name: str, index: int = 0):
@@ -209,7 +243,7 @@ def workbench_toolbar_panels() -> list[RibbonPanel]:
                 continue
             if cmd == "Std_Workbench":
                 continue
-            ribbon_commands.append(_command_meta(cmd))
+            ribbon_commands.extend(expand_command(_command_meta(cmd)))
         if ribbon_commands:
             panels.append(
                 RibbonPanel(name=str(toolbar_name), commands=tuple(ribbon_commands))

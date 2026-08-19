@@ -88,6 +88,7 @@ Preferences (stored under `User parameter:BaseApp/Preferences/Mod/NeoRibbon`):
 - **Show button labels** — text beside/under focus-strip icons (default on); section dropdowns always keep labels
 - **Button size** — `small` \| `medium` \| `large`
 - **Visible commands / section** — most-used commands shown as buttons (default 6); the rest are under **More ▾**
+- **Dropdown command children** — compound tools (Rectangle, Arc, …) keep Centered/Rounded/etc. **nested in a dropdown**, or **listed individually** as separate ribbon buttons
 - **Ignored toolbars** — semicolon-separated FreeCAD toolbar names to skip permanently
 - **Keyboard shortcuts** — toggle ribbon (default `Ctrl+Shift+N`): click the field and press keys, or **Reset**. A valid chord is saved as soon as you record it. A chord already used by FreeCAD is rejected immediately.
 - **Restore classic toolbars** — button in preferences (and Tools menu); disables the ribbon and re-docks classic bars, including ones that vanished from **View → Toolbars**. Infrequent recovery, not a shortcut.
@@ -139,6 +140,7 @@ NeoRibbon/
 10. **Edit → Preferences → NeoRibbon** shows **NeoRibbon x.y.z** at the bottom; Apply/OK updates the live ribbon.
 11. Change the toggle shortcut in preferences — it should take effect immediately. A used chord is rejected. **Restore classic toolbars** in that same page disables the ribbon without a keyboard shortcut.
 12. Leave classic toolbars on, quit and restart — the strip is intact and **View → Toolbars** still lists them. If bars are missing from that menu, **Restore classic toolbars** re-docks them.
+13. Sketcher **Rectangle** chevron lists Centered / Rounded. Switching **Dropdown command children** to **Listed individually** shows those as separate buttons after Apply.
 
 A short automated GUI probe is in [`scripts/smoke_gui.py`](scripts/smoke_gui.py):
 

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>440</width>
-    <height>430</height>
+    <height>470</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -135,6 +135,43 @@
     </layout>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="childLayout">
+     <item>
+      <widget class="QLabel" name="labelChildCommands">
+       <property name="text">
+        <string>Dropdown command children</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="Gui::PrefComboBox" name="comboChildCommandMode">
+       <property name="toolTip">
+        <string>Compound tools such as Rectangle keep Centered/Rounded in a dropdown, or list each child as its own ribbon button.</string>
+       </property>
+       <property name="currentIndex">
+        <number>0</number>
+       </property>
+       <property name="prefEntry" stdset="0">
+        <cstring>ChildCommandMode</cstring>
+       </property>
+       <property name="prefPath" stdset="0">
+        <cstring>Mod/NeoRibbon</cstring>
+       </property>
+       <item>
+        <property name="text">
+         <string>Nested in dropdown</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Listed individually</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="ignoredLayout">
      <item>
       <widget class="QLabel" name="labelIgnored">
@@ -189,7 +226,7 @@
    <item>
     <widget class="QLabel" name="labelHint">
      <property name="text">
-      <string>Each section shows your most-used commands; the rest are under More. Hide or reorder sections from Sections. Button size changes icon and ribbon height. Apply or OK updates the ribbon immediately.</string>
+      <string>Each section shows your most-used commands; the rest are under More. Dropdown children can stay nested or be listed individually. Hide or reorder sections from Sections. Button size changes icon and ribbon height. Apply or OK updates the ribbon immediately.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -199,7 +236,7 @@
    <item>
     <widget class="QLabel" name="labelVersion">
      <property name="text">
-      <string>NeoRibbon 0.3.5</string>
+      <string>NeoRibbon 0.3.6</string>
      </property>
      <property name="toolTip">
       <string>Installed addon version from package.xml</string>

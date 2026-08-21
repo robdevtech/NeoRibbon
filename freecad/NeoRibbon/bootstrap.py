@@ -462,7 +462,7 @@ def _resources_dir() -> str:
 
 def _register_preference_page() -> None:
     resources = _resources_dir()
-    icons = os.path.join(resources, "icons")
+    icons = os.path.join(resources, "Icons")
     ui = os.path.join(resources, "ui", "preferences.ui")
     if not os.path.isfile(ui):
         App.Console.PrintWarning(f"NeoRibbon: preference UI missing: {ui}\n")
